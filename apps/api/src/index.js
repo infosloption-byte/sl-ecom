@@ -22,7 +22,7 @@ import { addressSchema, email, password, productSchema, settingsSchema } from '.
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
-const origins = (process.env.WEB_ORIGIN || 'http://localhost:5176').split(',').map(x => x.trim()).filter(Boolean);
+const origins = (process.env.WEB_ORIGIN || 'http://localhost:5180').split(',').map(x => x.trim()).filter(Boolean);
 app.use(helmet({
   crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   contentSecurityPolicy: {

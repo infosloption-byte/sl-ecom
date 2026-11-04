@@ -201,6 +201,7 @@ model OrderItem {
   quantity       Int
   lineTotalCents Int
   order          Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([productId])
 }
 
 

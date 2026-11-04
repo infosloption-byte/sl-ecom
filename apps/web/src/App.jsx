@@ -9,6 +9,7 @@ import { Spinner } from './components';
 import { HeaderMenus } from './HeaderMenus';
 import { OrderDetails } from './OrderDetails';
 import { ScrollManager } from './ScrollManager';
+import { AppPreloader } from './AppPreloader';
 import { ContactPage, PoliciesPage, ShippingReturnsPage, PrivacyPage, TermsPage } from './LegalPages';
 
 function Brand() { return <Link to="/" className="brand" aria-label="SL Options Market home"><span className="brand-symbol">s<span>✳</span></span><span className="brand-copy"><strong>SL OPTIONS</strong><small>MARKET / SRI LANKA</small></span></Link>; }

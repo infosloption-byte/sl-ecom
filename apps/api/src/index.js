@@ -17,7 +17,7 @@ import { prisma } from './db.js';
 import { optionalAuth, requireAuth, requireAdmin, startSession, signOut, verifyGoogleCredential } from './auth.js';
 import { asyncRoute as route, error, orderNumber, publicUser, shippingFor, slugify, token, sha256 } from './utils.js';
 import { mailEnabled, sendResetEmail, sendOrderEmails, sendContactMail } from './mail.js';
-import { addressSchema, email, password, productSchema, settingsSchema } from './validators.js';
+import { addressSchema, email, password, productSchema, settingsSchema, contactSchema } from './validators.js';
 import { validateStatusChange } from './orderTracking.js';
 
 const app = express();
@@ -68,14 +68,7 @@ app.get('/api/settings', route(async (_req, res) => {
 const contactLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders:'draft-7',
   legacyHeaders:false, message:{error:'Too many contact requests. Please try again later.'} });
 app.post('/api/contact', contactLimit, route(async (req, res) => {
-  const input = z.object({
-    name: z.string().trim().min(2).max(120),
-    email,
-    topic: z.enum(['Order question','Product enquiry','Delivery or tracking','Return or refund','Other']),
-    orderNumber: z.string().trim().max(40).optional().default(''),
-    message: z.string().trim().min(10).max(3000),
-    website: z.string().max(120).optional().default('')
-  }).strict().parse(req.body);
+  const input = contactSchema.parse(req.body);
   if (input.website) return res.status(202).json({ok:true});
   if (!mailEnabled()) throw error(503, 'Contact email is not configured. Please use the store email address.');
   const store = await prisma.storeSettings.findUnique({ where:{id:'main'}, select:{contactEmail:true} });

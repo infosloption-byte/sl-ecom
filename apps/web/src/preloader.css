@@ -1,0 +1,54 @@
+/* Lightweight SL Options Market preloader; used before and after React mounts. */
+.market-loader{
+  position:fixed;inset:0;z-index:1000;display:grid;place-items:center;
+  min-height:100dvh;padding:24px;background:#f8f9f4;color:#203329;
+  overflow:hidden;isolation:isolate;
+  transition:opacity .42s ease,visibility .42s ease;
+}
+.market-loader::before,.market-loader::after{
+  content:"";position:absolute;width:min(66vw,700px);aspect-ratio:1;border-radius:50%;
+  z-index:-1;pointer-events:none;
+}
+.market-loader::before{
+  top:-38%;right:-24%;background:radial-gradient(circle,#dceccd 0%,#e9f3e288 45%,transparent 73%);
+}
+.market-loader::after{
+  left:-30%;bottom:-55%;background:radial-gradient(circle,#e5edd9 0%,#eef3e675 45%,transparent 72%);
+}
+.market-loader--leaving{opacity:0;visibility:hidden;pointer-events:none}
+.market-loader__content{display:flex;flex-direction:column;align-items:center;gap:0;text-align:center;width:min(100%,340px);transform:translateY(-16px)}
+.market-loader__emblem{width:106px;height:106px;display:grid;place-items:center;position:relative;margin-bottom:30px}
+.market-loader__orbit{position:absolute;inset:0;border:1px solid #ccdfc6;border-radius:50%;animation:market-orbit 4s linear infinite}
+.market-loader__orbit::after{content:"";position:absolute;top:5px;left:17px;width:10px;height:10px;border-radius:50%;background:#8db575;box-shadow:0 0 0 6px #c9e7b75a}
+.market-loader__orbit--inner{inset:12px;border-color:#dde9d4;animation-direction:reverse;animation-duration:5.4s}
+.market-loader__orbit--inner::after{width:6px;height:6px;top:2px;left:12px;background:#a6bb8d;box-shadow:none}
+.market-loader__symbol{display:flex;align-items:center;justify-content:center;width:66px;height:66px;border-radius:19px;background:#1c2e23;color:#dff8ba;box-shadow:0 18px 35px #1a342325;position:relative;animation:market-breathe 2.5s ease-in-out infinite}
+.market-loader__symbol b{font:normal 52px/.9 Georgia,serif;letter-spacing:-.12em;transform:translate(-3px,-2px)}
+.market-loader__symbol i{position:absolute;top:9px;right:9px;font:normal 15px/1 sans-serif;color:#d6ef9d;animation:market-twinkle 2.3s ease-in-out infinite}
+.market-loader__name{font:800 1.05rem/1.25 Manrope,'DM Sans',sans-serif;letter-spacing:.22em;margin:0 0 7px}
+.market-loader__name span{display:block;font-size:.74rem;letter-spacing:.32em;font-weight:700;margin-top:9px;color:#627f61}
+.market-loader__caption{font:500 .78rem/1.6 'DM Sans',sans-serif;color:#7b9080;margin:26px 0 16px}
+.market-loader__track{width:166px;height:3px;border-radius:99px;background:#e1eadd;overflow:hidden}
+.market-loader__bar{display:block;width:43%;height:100%;background:linear-gradient(90deg,#6f9b6d,#c1e39c);border-radius:99px;animation:market-slide 1.45s cubic-bezier(.4,0,.2,1) infinite}
+.market-loader__foot{position:absolute;left:20px;right:20px;bottom:max(23px,env(safe-area-inset-bottom));text-align:center;font:700 .6rem/1.6 'DM Sans',sans-serif;letter-spacing:.2em;color:#8da08c}
+.market-inline-loading{gap:10px;flex-wrap:wrap}
+.market-inline-loading__star{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#e2edd9;color:#4b7951;font-size:21px;animation:market-inline-spin 1.8s ease-in-out infinite}
+@keyframes market-orbit{to{transform:rotate(360deg)}}
+@keyframes market-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+@keyframes market-twinkle{0%,100%{opacity:.65;transform:scale(.85) rotate(-12deg)}50%{opacity:1;transform:scale(1.13) rotate(15deg)}}
+@keyframes market-slide{0%{transform:translateX(-115%)}60%{transform:translateX(190%)}100%{transform:translateX(340%)}}
+@keyframes market-inline-spin{50%{transform:rotate(90deg) scale(1.09)}}
+@media(max-width:600px){
+  .market-loader__emblem{width:94px;height:94px;margin-bottom:24px}
+  .market-loader__symbol{width:62px;height:62px}
+  .market-loader__symbol b{font-size:49px}
+  .market-loader__name{font-size:.96rem}
+  .market-loader__caption{font-size:.75rem}
+  .market-loader::before{top:-20%;right:-52%}
+  .market-loader::after{left:-60%;bottom:-24%}
+}
+@media(prefers-reduced-motion:reduce){
+  .market-loader,.market-loader__orbit,.market-loader__symbol,.market-loader__symbol i,.market-loader__bar,.market-inline-loading__star{animation:none!important;transition:none!important}
+  .market-loader--leaving{display:none}
+  .market-loader__bar{transform:none;width:100%}
+}

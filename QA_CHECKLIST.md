@@ -87,3 +87,14 @@ Run these tests on a local or staging MySQL database after `npm install`, `npm r
 - [ ] Shipping & Returns, Privacy, Terms and /policies hub routes are reachable from footer; their internal links and account policy links work.
 - [ ] Verify actual business name, merchant address, official support inbox, shipping/return windows and legally required policy details before production.
 - [ ] Confirm desktop, tablet and mobile checkout/cart/product detail layouts still work after adding the responsive styles.
+
+## Branded frontend preloader
+
+- [ ] A fresh hard reload shows the **SL OPTIONS MARKET** branded loading screen immediately, before React has finished starting.
+- [ ] Once initial session/account checks finish, the loading screen fades away automatically with no unnecessary minimum wait.
+- [ ] The loader remains centered on phone, tablet and desktop; no horizontal scrolling or clipped text.
+- [ ] Product, wishlist, orders and other async views show the small branded loading indicator without flashing a full-screen loader on every route.
+- [ ] Navigate across pages after startup: route scroll reset and centered top-bar previews continue to work normally.
+- [ ] Enable **Reduce motion** in the OS/browser: orbit, pulse and progress animations stop and the overlay disappears without motion.
+- [ ] Test with the API briefly unavailable: the screen does not trap customers indefinitely; regular API error/empty states become visible.
+- [ ] Confirm no requests are triggered by the loader itself and no customer/order data appears within loading markup.

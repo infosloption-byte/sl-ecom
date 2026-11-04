@@ -12,7 +12,7 @@ function transport() {
   });
 }
 export async function sendResetEmail(email, token) {
-  const url = new URL('/reset-password', process.env.STORE_URL || 'http://localhost:5176');
+  const url = new URL('/reset-password', process.env.STORE_URL || 'http://localhost:5180');
   url.searchParams.set('token', token);
   await transport().sendMail({ from: process.env.SMTP_FROM, to: email, subject: 'Reset your SL Options Market password',
     text: `Use this link to reset your password. It expires in 30 minutes.\n\n${url}\n\nIf you did not request this, you can ignore the message.`,

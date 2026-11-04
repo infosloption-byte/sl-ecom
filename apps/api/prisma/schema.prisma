@@ -34,7 +34,7 @@ enum PaymentStatus {
 }
 
 model User {
-  id           String      @id @default(cuid())
+  id           String      @id @default(cuid()) @db.VarChar(64)
   email        String      @unique @db.VarChar(191)
   name         String      @db.VarChar(120)
   phone        String?     @db.VarChar(30)
@@ -52,8 +52,8 @@ model User {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  userId    String
+  id        String   @id @default(cuid()) @db.VarChar(64)
+  userId    String @db.VarChar(64)
   tokenHash String   @unique @db.Char(64)
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -63,8 +63,8 @@ model Session {
 }
 
 model PasswordResetToken {
-  id        String    @id @default(cuid())
-  userId    String
+  id        String    @id @default(cuid()) @db.VarChar(64)
+  userId    String @db.VarChar(64)
   tokenHash String    @unique @db.Char(64)
   expiresAt DateTime
   usedAt    DateTime?
@@ -75,8 +75,8 @@ model PasswordResetToken {
 }
 
 model Address {
-  id        String   @id @default(cuid())
-  userId    String
+  id        String   @id @default(cuid()) @db.VarChar(64)
+  userId    String @db.VarChar(64)
   fullName  String   @db.VarChar(120)
   phone     String   @db.VarChar(30)
   line1     String   @db.VarChar(191)
@@ -91,7 +91,7 @@ model Address {
 }
 
 model Category {
-  id        String    @id @default(cuid())
+  id        String    @id @default(cuid()) @db.VarChar(64)
   name      String    @db.VarChar(100)
   slug      String    @unique @db.VarChar(120)
   active    Boolean   @default(true)
@@ -100,7 +100,7 @@ model Category {
 }
 
 model Product {
-  id             String        @id @default(cuid())
+  id             String        @id @default(cuid()) @db.VarChar(64)
   title          String        @db.VarChar(191)
   slug           String        @unique @db.VarChar(191)
   description    String        @db.Text
@@ -110,7 +110,7 @@ model Product {
   stock          Int           @default(0)
   featured       Boolean       @default(false)
   status         ProductStatus @default(DRAFT)
-  categoryId     String
+  categoryId     String @db.VarChar(64)
   category       Category      @relation(fields: [categoryId], references: [id])
   cartItems      CartItem[]
   wishlistItems  WishlistItem[]
@@ -121,9 +121,9 @@ model Product {
 }
 
 model CartItem {
-  id        String   @id @default(cuid())
-  userId    String
-  productId String
+  id        String   @id @default(cuid()) @db.VarChar(64)
+  userId    String @db.VarChar(64)
+  productId String @db.VarChar(64)
   quantity  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -133,19 +133,19 @@ model CartItem {
 }
 
 model WishlistItem {
-  id        String   @id @default(cuid())
-  userId    String
-  productId String
+  id        String   @id @default(cuid()) @db.VarChar(64)
+  userId    String @db.VarChar(64)
+  productId String @db.VarChar(64)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   @@unique([userId, productId])
 }
 
 model Order {
-  id             String        @id @default(cuid())
+  id             String        @id @default(cuid()) @db.VarChar(64)
   number         String        @unique @db.VarChar(40)
   checkoutKey    String        @unique @db.VarChar(100)
-  userId         String
+  userId         String @db.VarChar(64)
   user           User          @relation(fields: [userId], references: [id])
   status         OrderStatus   @default(PLACED)
   paymentMethod  String        @default("COD") @db.VarChar(20)
@@ -163,9 +163,9 @@ model Order {
 }
 
 model OrderItem {
-  id             String @id @default(cuid())
-  orderId        String
-  productId      String
+  id             String @id @default(cuid()) @db.VarChar(64)
+  orderId        String @db.VarChar(64)
+  productId      String @db.VarChar(64)
   title          String @db.VarChar(191)
   imageUrl       String? @db.VarChar(500)
   unitPriceCents Int
@@ -175,7 +175,7 @@ model OrderItem {
 }
 
 model StoreSettings {
-  id                    String @id @default("main")
+  id                    String @id @default("main") @db.VarChar(64)
   storeName             String @default("SL Options Market") @db.VarChar(120)
   announcement          String @default("Islandwide delivery across Sri Lanka") @db.VarChar(200)
   contactEmail          String @default("hello@sloptions.xyz") @db.VarChar(191)

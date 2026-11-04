@@ -65,6 +65,42 @@ sl-options-market/
   package.json       npm workspaces
 ```
 
+## WAMP Server setup (Windows, without Docker)
+
+Start WAMP MySQL, then create an empty `slstore` database in phpMyAdmin using `utf8mb4`. WAMP Apache is not needed for React/Node.js development. The initial migration now explicitly uses InnoDB to enforce foreign keys, and 64-character IDs to stay within shorter index limits.
+
+From the repository root in PowerShell:
+
+```powershell
+Copy-Item apps/api/.env.example apps/api/.env
+Copy-Item apps/web/.env.example apps/web/.env
+# Edit apps/api/.env: DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, etc.
+# Example when the WAMP root account has no password (local development only):
+# DATABASE_URL="mysql://root@127.0.0.1:3306/slstore"
+npm install
+npm run db:generate
+npm run db:deploy
+npm run db:seed
+npm run dev
+```
+
+Use your actual WAMP MySQL port and login; percent-encode special characters in a password included in the database URL. A dedicated database user is recommended beyond local development.
+
+### Initial failed migration: P3018 / MySQL 1071
+
+The previous initial migration indexed two `VARCHAR(191)` foreign-key columns together, exceeding a 1,000-byte index cap under `utf8mb4`. After pulling the corrected files, **only if this is a new/disposable `slstore` database with no data worth keeping**, run:
+
+```powershell
+git pull origin main
+# DANGER: Permanently deletes all data and tables in the slstore database.
+npm exec -w apps/api -- prisma migrate reset --force
+npm run db:generate
+npm run db:seed
+npm run dev
+```
+
+Do not run `migrate reset` against a database containing valuable data. Back it up and inspect the `_prisma_migrations` table plus partially created tables first; use a non-destructive recovery plan instead. This initial migration was amended only because the reported deployment failed before the application had been initialized.
+
 ## Local setup (Node 22 and npm 10+)
 
 1. Install Node.js 22+, npm, and MySQL 8.4 (or Docker with Compose).

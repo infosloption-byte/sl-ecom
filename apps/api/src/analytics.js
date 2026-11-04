@@ -22,7 +22,7 @@ const num=v=>Number(v??0);
 export async function analyticsSummary(prisma,days){
   const since=daysSince(days),where={createdAt:{gte:since}};
   const validOrders={status:{not:'CANCELLED'},createdAt:{gte:since}};
-  const [eventGroups,products,itemsOrdered,carts,wishes,orderTotals,paidTotals,dailyEvents,dailyOrders,visitorRows,customerRows]=await Promise.all([
+  const [eventGroups,products,itemsOrdered,carts,wishes,orderTotals,paidTotals,dailyEvents,dailyOrders,visitorRows,customerRows,noPurchaseRows]=await Promise.all([
     prisma.productEvent.groupBy({by:['productId','type'],where,_count:{_all:true}}),
     prisma.product.findMany({select:{id:true,title:true,slug:true,imageUrl:true,stock:true,status:true},orderBy:{createdAt:'desc'},take:500}),
     prisma.orderItem.groupBy({by:['productId'],where:{order:validOrders},_sum:{quantity:true,lineTotalCents:true},_count:{_all:true}}),
@@ -33,7 +33,9 @@ export async function analyticsSummary(prisma,days){
     prisma.$queryRaw(Prisma.sql(["SELECT DATE_FORMAT(createdAt,'%Y-%m-%d') AS day, type, COUNT(*) AS total FROM ProductEvent WHERE createdAt >= "," GROUP BY DATE_FORMAT(createdAt,'%Y-%m-%d'),type ORDER BY day ASC"],since)),
     prisma.$queryRaw(Prisma.sql(["SELECT DATE_FORMAT(createdAt,'%Y-%m-%d') AS day, COUNT(*) AS orders FROM \u0060Order\u0060 WHERE createdAt >= "," AND status <> 'CANCELLED' GROUP BY DATE_FORMAT(createdAt,'%Y-%m-%d') ORDER BY day ASC"],since)),
     prisma.$queryRaw(Prisma.sql(["SELECT COUNT(DISTINCT CASE WHEN userId IS NOT NULL THEN CONCAT('u:',userId) ELSE CONCAT('v:',visitorId) END) AS visitors FROM ProductEvent WHERE createdAt >= ",""],since)),
-    prisma.$queryRaw(Prisma.sql(["SELECT COUNT(DISTINCT userId) AS customers FROM ProductEvent WHERE createdAt >= "," AND userId IS NOT NULL"],since))
+    prisma.$queryRaw(Prisma.sql(["SELECT COUNT(DISTINCT userId) AS customers FROM ProductEvent WHERE createdAt >= "," AND userId IS NOT NULL"],since)),
+    prisma.$queryRaw(Prisma.sql(["SELECT pe.productId AS productId, COUNT(DISTINCT pe.userId) AS interestCount FROM ProductEvent pe WHERE pe.createdAt >= ",
+      " AND pe.userId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM OrderItem oi JOIN \u0060Order\u0060 o ON o.id = oi.orderId WHERE oi.productId = pe.productId AND o.userId = pe.userId AND o.status <> 'CANCELLED') GROUP BY pe.productId"],since))
   ]);
   const grouped=new Map(),totals=zero();
   for(const e of eventGroups){
@@ -42,11 +44,13 @@ export async function analyticsSummary(prisma,days){
     totals[e.type]+=e._count._all;
   }
   const purchases=new Map(itemsOrdered.map(x=>[x.productId,x])), inCarts=new Map(carts.map(x=>[x.productId,x])),wishlisted=new Map(wishes.map(x=>[x.productId,x]));
+  const withoutPurchase=new Map(noPurchaseRows.map(x=>[x.productId,num(x.interestCount)]));
   const allProducts=products.map(p=>{
     const e=grouped.get(p.id)||zero(),o=purchases.get(p.id),c=inCarts.get(p.id),w=wishlisted.get(p.id);
     return {...p,views:e.VIEW,clicks:e.CLICK,cartAdds:e.CART_ADD,wishlistAdds:e.WISHLIST_ADD,checkoutStarts:e.CHECKOUT_START,
       orderLines:o?._count._all||0,unitsOrdered:o?._sum.quantity||0,orderValueCents:o?._sum.lineTotalCents||0,
-      inCarts:c?._count._all||0,cartUnits:c?._sum.quantity||0,wishlistedNow:w?._count._all||0};
+      inCarts:c?._count._all||0,cartUnits:c?._sum.quantity||0,wishlistedNow:w?._count._all||0,
+      interestedNotPurchased:withoutPurchase.get(p.id)||0};
   }).sort((a,b)=>b.views-a.views||b.cartAdds-a.cartAdds||b.unitsOrdered-a.unitsOrdered);
   const byDay=new Map();
   for(let i=days-1;i>=0;i--){const day=new Date(Date.now()-i*DAY).toISOString().slice(0,10);byDay.set(day,{day,views:0,clicks:0,cartAdds:0,wishlistAdds:0,checkoutStarts:0,orders:0});}
@@ -54,6 +58,7 @@ export async function analyticsSummary(prisma,days){
   for(const x of dailyOrders){const row=byDay.get(String(x.day));if(row)row.orders=num(x.orders);}
   return {days,from:since.toISOString(),retentionDays:ANALYTICS_RETENTION_DAYS,metrics:{...totals,
     estimatedVisitors:num(visitorRows[0]?.visitors),identifiedCustomers:num(customerRows[0]?.customers),
+    interestWithoutPurchasePairs:noPurchaseRows.reduce((sum,x)=>sum+num(x.interestCount),0),
     orders:orderTotals._count._all,orderedValueCents:orderTotals._sum.totalCents||0,
     paidOrders:paidTotals._count._all,receivedCents:paidTotals._sum.totalCents||0},
     products:allProducts,daily:[...byDay.values()]};

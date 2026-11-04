@@ -7,6 +7,7 @@ Run these tests on a local or staging MySQL database after `npm install`, `npm r
 - [ ] Home page loads demo products and four categories; responsive at 360, 390, 768, 1024 and 1440 px.
 - [ ] Shop search, category filter, sorting and pagination produce correct results.
 - [ ] Product details show price in LKR, stock, description and image.
+- [ ] Full product description always appears as a dedicated section **below** the gallery/price/cart panel and **above** specifications, not inline beside the gallery; verify paragraphs/line breaks and mobile widths.
 - [ ] Anonymous visitor adds product to bag; bag survives refresh and syncs after registration/login.
 - [ ] Signed-in visitor adds/removes products, adjusts quantities and sees updated totals.
 - [ ] Wishlist only works while authenticated and persists across sessions.

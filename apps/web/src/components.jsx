@@ -71,4 +71,4 @@ export function ProductCard({ product }) {
 }
 export function EmptyState({ icon: Icon = ShoppingBag, title, description, link = '/shop', action = 'Explore the shop' }) { return <div className="empty-state"><div className="empty-icon"><Icon size={31}/></div><h2>{title}</h2><p>{description}</p><Link to={link} className="button button-dark">{action}<ArrowRight size={17}/></Link></div>; }
 export function PageHeading({ eyebrow, title, description }) { return <div className="page-heading"><span className="eyebrow">{eyebrow}</span><h1>{title}</h1>{description && <p>{description}</p>}</div>; }
-export function Spinner() { return <div className="loading"><span className="spinner"/>Loading your experience...</div>; }
+export function Spinner({ label = "Loading your experience..." }) { return <div className="loading market-inline-loading" role="status" aria-live="polite"><span className="market-inline-loading__star" aria-hidden="true">✳</span><span>{label}</span></div>; }

@@ -1,4 +1,5 @@
 -- Additive first-party product analytics. Existing products, orders and customers remain unchanged.
+CREATE INDEX `OrderItem_productId_idx` ON `OrderItem`(`productId`);
 CREATE TABLE `ProductEvent` (
   `id` VARCHAR(64) NOT NULL,
   `productId` VARCHAR(64) NOT NULL,

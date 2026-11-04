@@ -1,0 +1,182 @@
+# SL Options Market
+
+A **mobile-first Sri Lankan e-commerce starter platform** built for the **SL Options** product family. It has a React storefront, React administration workspace, Express/Node.js REST API, MySQL + Prisma database, and a deliberately compact domain model.
+
+> **Important:** This is an implementation-ready starter, not a verified production launch. Install dependencies, configure Google and SMTP, test against MySQL, replace sample products and legal copy, and complete the production security checklist before taking real orders.
+
+## What's included
+
+| Customer experience | Staff / admin experience |
+| --- | --- |
+| Editorial home, categories, live search, sorting, product details | Protected dashboard with metrics and recent orders |
+| Cart (guest cart + sign-in sync), quantity controls, stock checks | Create/edit/archive products, set prices, stock, featured flag |
+| Wishlist associated with account | Manage categories and catalogue visibility |
+| Email/password registration and login | View customer accounts |
+| Google sign-in and authenticated Google account linking | View orders and change fulfilment/payment status |
+| Password recovery by expiring email link (SMTP required) | Upload product images (JPEG/PNG/WebP) |
+| Saved delivery addresses, account settings, purchases | Edit store name, announcement, delivery fees and support email |
+| Sri Lankan addresses: districts, LKR and islandwide flat/free delivery | Optional order email alerts (SMTP required) |
+| Secure cookie sessions; checkout order and stock transaction | Responsive, light modern workspace |
+
+### Design
+
+Visual direction: soft ivory background, deep evergreen, pale citrus highlights, bold editorial headings and calm product photography/illustrations. All demo product images are local **illustrations**, not verified photos of items for sale. Replace them in the admin before launch.
+
+### Payment gateway decision
+
+**Physical products cannot be processed using Paddle.** Paddle's acceptable-use policy explicitly lists physical products and products requiring delivery as prohibited. This starter enables **cash on delivery** and tracks payment manually in admin. For card payments, integrate an approved Sri Lankan e-commerce merchant gateway such as **PayHere** or **OnePay** after merchant onboarding. Never mark an order as paid from a browser redirect; a future online gateway must verify a signed server-to-server callback/webhook and use idempotency.
+
+References:
+- Paddle acceptable use: https://www.paddle.com/help/start/intro-to-paddle/what-am-i-not-allowed-to-sell-on-paddle
+- Google ID-token verification: https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
+- PayHere: https://support.payhere.lk/general-questions
+- OnePay: https://www.onepay.lk/solutions/online-payments
+
+## Architecture
+
+```mermaid
+flowchart TD
+  C[Customer on mobile or desktop] --> W[React storefront - Vite]
+  A[Store administrator] --> AD[React admin workspace]
+  W --> API[Node.js / Express REST API]
+  AD --> API
+  API --> DB[(MySQL 8.4 / Prisma)]
+  API --> IMG[(Local uploaded images)]
+  API --> MAIL[SMTP transactional mail, optional]
+  W --> G[Google Identity Services]
+  G --> API
+```
+
+One React application serves both `/` and `/admin`. The API guards all `/api/admin/*` routes by the database ADMIN role; there is no public admin registration route.
+
+### Project structure
+
+```
+sl-options-market/
+  apps/
+    web/             React 19 + Vite; responsive storefront and admin
+      src/
+      public/demo/   Demo product SVG illustrations
+    api/             Express API and authentication
+      src/
+      prisma/        MySQL data schema, initial migration, seed
+      tests/         Pure logic tests
+  docker-compose.yml Local MySQL container
+  package.json       npm workspaces
+```
+
+## Local setup (Node 22 and npm 10+)
+
+1. Install Node.js 22+, npm, and MySQL 8.4 (or Docker with Compose).
+2. Clone/extract the project.
+3. Start local MySQL:
+
+```bash
+# From the repository root
+docker compose up -d mysql
+```
+
+The example Docker configuration binds MySQL to **127.0.0.1:3308**, so it does not collide with an existing MySQL on port 3306. The included database credentials are for **local development only**; change them for any shared or live environment.
+
+4. Configure environment and install dependencies:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+npm install
+npm run db:generate
+npm run db:deploy
+npm run db:seed
+```
+
+For Windows PowerShell, use `Copy-Item` instead of `cp` as needed.
+
+5. Start both apps:
+
+```bash
+npm run dev
+```
+
+- Storefront: http://localhost:5176
+- Admin: http://localhost:5176/admin
+- API health: http://localhost:4010/api/health
+
+**Development seed:** `ADMIN_EMAIL=admin@example.com` and `ADMIN_PASSWORD=ChangeMeAdminPassword123!` are placeholder settings in `apps/api/.env.example`. Replace them with an email you control and a strong unique password *before running the seed*, then sign in at `/login` and visit `/admin`. The seed never overwrites an existing admin password and will not promote an existing customer automatically. The seeded eight items are labeled demo products.
+
+If you already use a local MySQL installation, create a database and user, then point `DATABASE_URL` in `apps/api/.env` to it. You can skip Docker.
+
+## Configure Google sign-in
+
+Create a **Web application OAuth Client ID** in Google Cloud (OAuth consent screen and Google Identity Services). During local development add `http://localhost:5176` to the client's **Authorized JavaScript origins**. In production add the HTTPS storefront origin.
+
+Set the **same** client ID in:
+
+- `apps/api/.env` as `GOOGLE_CLIENT_ID`
+- `apps/web/.env` as `VITE_GOOGLE_CLIENT_ID`
+
+Restart the API and Vite after editing environment values. The React Google button receives a Google ID token; the backend validates signature, expiry, issuer and configured audience with `google-auth-library` and persists the stable Google `sub`. An existing email/password account must be signed into first before attaching Google in Account > Settings. There is no unsafe automatic linking by email alone.
+
+## Configure password recovery and order emails
+
+Set these in `apps/api/.env` using an SMTP account approved for transactional mail:
+
+```dotenv
+STORE_URL=http://localhost:5176
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=mailer@example.com
+SMTP_PASSWORD=<set-a-private-smtp-password>
+SMTP_FROM="SL Options Market <mailer@example.com>"
+ORDER_ALERT_EMAIL=<your-inbox>
+```
+
+Without SMTP, checkout and order management work but emails are **not sent**, and password recovery returns a configuration message. Configure an SMTP sender before selling to customers. Password reset tokens are stored hashed, expire after 30 minutes and are single-use. Order confirmation mail is best-effort; the order transaction succeeds independently from mail delivery.
+
+## How to use the platform
+
+1. Sign in with the admin credentials you seeded and visit `/admin`.
+2. Add/edit categories and products. Product prices in admin are shown in **LKR**, and stored in **cents** (`priceCents`) internally.
+3. Upload real photos and change each product to **ACTIVE** to list it on the customer store. Use **DRAFT** to hide products.
+4. Configure delivery pricing in Admin > Store settings. The default is **Rs. 450 flat** and **free delivery from Rs. 15,000**, both examples and adjustable.
+5. Customer browses, adds to cart, signs in/creates account, adds delivery address and confirms cash-on-delivery order.
+6. Admin reviews and fulfils the order in Admin > Orders. Changing an order to CANCELLED returns reserved stock; cancelled orders cannot be reopened. **PAID** should only be selected when payment has genuinely been collected.
+
+## Production deployment notes
+
+Run the backend and built frontend under the **same HTTPS origin** if possible:
+
+```bash
+npm run build
+# Configure NODE_ENV=production, WEB_ORIGIN=https://your-store-domain,
+# STORE_URL=https://your-store-domain, DATABASE_URL, and secure SMTP.
+npm run db:deploy
+npm run start
+```
+
+The Express API serves the prebuilt `apps/web/dist` files alongside `/api` and `/uploads`. Put the Node server behind Nginx, Caddy or another trusted HTTPS reverse proxy; configure `TRUST_PROXY=true` **only** when your reverse proxy is trusted and forwards client IPs correctly. Do not expose Node or MySQL ports publicly. Persist and back up `apps/api/uploads` and MySQL. Configure a process manager or container health checks.
+
+Production checklist before launch:
+
+- Confirm migration success, seed only approved admin accounts, rotate all example credentials.
+- Verify Google OAuth origins, `WEB_ORIGIN`, same-origin HTTPS, secure cookies and login/logout flows.
+- Configure SMTP and verify reset, confirmation and store notification emails.
+- Replace demo listings, price/stock figures, photos, brand copy, and placeholder support address.
+- Write and review real privacy notice, terms, returns/refunds, shipping timelines, contact page, and applicable Sri Lankan tax/consumer obligations.
+- Perform payment-gateway merchant onboarding before enabling cards or LankaQR; COD works now.
+- Test stock conflicts, multiple simultaneous checkouts, cancellations, order status updates and rate limits against MySQL.
+- Implement monitoring, backups, restore drills, admin MFA, operational audit log and stronger abuse controls before accepting meaningful production traffic.
+- Evaluate hosted object storage (S3/Lightsail Object Storage) for product photos if you scale to multiple backend instances.
+- Review CSP with your final Google sign-in and image domains; limit approved product image domains.
+
+## Tests and status
+
+```bash
+npm test
+npm run build
+```
+
+6 utility tests cover slug generation, delivery threshold, public user data filtering and token/order identifier properties. Additional integration and end-to-end tests require dependencies and a running MySQL instance. The code in this archive was statically checked for JavaScript/JSX/CSS syntax and utility tests were run. **Dependency installation, Prisma schema validation, Vite production build and full API/UI flows were not executed in the generation environment because npm registry DNS was unavailable.** Run the installation, build and MySQL checkout test sequence on your machine before launching.
+
+## What this intentionally avoids
+
+No marketplace sellers, complex warehouse network, customer loyalty points, subscriptions, or multi-currency conversions. The first release is a **single-merchant Sri Lankan store** with clear customer and admin workflows.

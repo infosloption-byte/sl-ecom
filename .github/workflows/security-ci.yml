@@ -1,0 +1,37 @@
+name: Security and build verification
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [security/npm-audit-remediation-20261104]
+
+permissions:
+  contents: read
+
+jobs:
+  verification:
+    name: npm audit, Prisma, unit tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: mysql://test:test@127.0.0.1:3306/slstore
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --no-fund
+      - name: Prisma generate
+        run: npm run db:generate
+      - name: Prisma validate schema
+        run: npm exec -w apps/api -- prisma validate
+      - name: Unit tests
+        run: npm test
+      - name: Frontend build
+        run: npm run build
+      - name: Audit all dependencies
+        run: npm audit --audit-level=high
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

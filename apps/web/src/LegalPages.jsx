@@ -16,7 +16,7 @@ function PolicyPage({ eyebrow, title, subtitle, children }) {
   return <div className="container inner-page policy-page">
     <PageHeading eyebrow={eyebrow} title={title} description={subtitle}/>
     <div className="policy-layout">
-      <main className="policy-body">{children}</main>
+      <div className="policy-body">{children}</div>
       <aside className="policy-sidebar">
         <h3>Helpful links</h3>
         {legalLinks.map(item=><Link key={item.to} to={item.to} className="policy-side-link"><b>{item.label}</b><small>{item.detail}</small></Link>)}

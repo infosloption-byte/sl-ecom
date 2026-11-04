@@ -133,17 +133,19 @@ For Windows PowerShell, use `Copy-Item` instead of `cp` as needed.
 npm run dev
 ```
 
-- Storefront: http://localhost:5176
-- Admin: http://localhost:5176/admin
+- Storefront: http://localhost:5180
+- Admin: http://localhost:5180/admin
 - API health: http://localhost:4010/api/health
 
 **Development seed:** `ADMIN_EMAIL=admin@example.com` and `ADMIN_PASSWORD=ChangeMeAdminPassword123!` are placeholder settings in `apps/api/.env.example`. Replace them with an email you control and a strong unique password *before running the seed*, then sign in at `/login` and visit `/admin`. The seed never overwrites an existing admin password and will not promote an existing customer automatically. The seeded eight items are labeled demo products.
 
 If you already use a local MySQL installation, create a database and user, then point `DATABASE_URL` in `apps/api/.env` to it. You can skip Docker.
 
+**Frontend development port:** Vite runs on `http://localhost:5180`. If `apps/api/.env` already exists on your machine, update `WEB_ORIGIN=http://localhost:5180` and `STORE_URL=http://localhost:5180` yourself; `.env` files are intentionally not committed. Register `http://localhost:5180` as an authorized JavaScript origin in Google Cloud for Google sign-in. Restart both development servers after changing environment settings.
+
 ## Configure Google sign-in
 
-Create a **Web application OAuth Client ID** in Google Cloud (OAuth consent screen and Google Identity Services). During local development add `http://localhost:5176` to the client's **Authorized JavaScript origins**. In production add the HTTPS storefront origin.
+Create a **Web application OAuth Client ID** in Google Cloud (OAuth consent screen and Google Identity Services). During local development add `http://localhost:5180` to the client's **Authorized JavaScript origins**. In production add the HTTPS storefront origin.
 
 Set the **same** client ID in:
 
@@ -157,7 +159,7 @@ Restart the API and Vite after editing environment values. The React Google butt
 Set these in `apps/api/.env` using an SMTP account approved for transactional mail:
 
 ```dotenv
-STORE_URL=http://localhost:5176
+STORE_URL=http://localhost:5180
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=mailer@example.com

@@ -72,3 +72,18 @@ Run these tests on a local or staging MySQL database after `npm install`, `npm r
 - [ ] Mobile and desktop header menus show wishlist items, account shortcuts/signout, and cart preview with subtotal.
 - [ ] Menus close on Escape, outside click and route change; keyboard and touch controls remain usable.
 - [ ] Admin sidebar sign-out clears the session and redirects away from protected admin screens.
+
+## Responsive navigation and store pages (November 2026 batch)
+
+- [ ] Navigate Shop → product → account → orders → Contact; every full page opens at the top, including browser Back/Forward.
+- [ ] Clicking a product or account link while halfway down the previous page does not retain the previous scroll position.
+- [ ] Custom category/district/topic dropdown navigation does not move the document unexpectedly when changing the highlighted option.
+- [ ] Desktop dropdowns anchor close to the selected top-bar icon; tablet (768–960 px) and phone (320–640 px) account/wishlist/cart previews appear centered below the sticky top bar.
+- [ ] Header previews stay fully on-screen and scroll internally; Escape, outside tap and navigation close the preview.
+- [ ] At 320, 375, 390, 768 and 1024 px: account overview, order cards, invoices, wishlist grid, addresses, settings forms and sign-out do not cause horizontal overflow.
+- [ ] Contact page loads from the footer and mobile menu; customer can submit valid enquiry with configured SMTP, with delivery to the merchant inbox and a success state.
+- [ ] Contact form shows a helpful fallback if SMTP is unavailable; invalid addresses, message <10 or >3000 characters and too many requests are rejected.
+- [ ] Contact form uses store-configured SMTP sender and destination only, not untrusted user input as an email recipient.
+- [ ] Shipping & Returns, Privacy, Terms and /policies hub routes are reachable from footer; their internal links and account policy links work.
+- [ ] Verify actual business name, merchant address, official support inbox, shipping/return windows and legally required policy details before production.
+- [ ] Confirm desktop, tablet and mobile checkout/cart/product detail layouts still work after adding the responsive styles.

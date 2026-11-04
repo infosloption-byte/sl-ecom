@@ -1,0 +1,134 @@
+/* Responsive improvements: header popovers, account workspace and store information pages. */
+html{scroll-padding-top:100px}
+body,#root,.site-shell{max-width:100%;min-width:0}
+.site-shell{overflow-x:clip}
+.header-preview-panel.header-preview-portal{right:auto!important;margin:0;box-sizing:border-box;overscroll-behavior:contain}
+.header-menu-dismiss{position:absolute;top:11px;right:12px;border:0;background:#edf3e8;color:#385740;border-radius:50%;width:29px;height:29px;display:grid;place-items:center}
+.header-preview-portal h3{padding-right:28px}
+.header-menu-backdrop{position:fixed;inset:0;border:0;z-index:400;background:rgba(16,35,20,.19);cursor:default}
+.header-preview-portal .preview-item img{flex-shrink:0}
+.header-preview-portal .preview-menu-link{min-height:40px}
+.header-preview-portal .preview-subtotal{gap:12px}
+.contact-page,.policy-page{min-width:0}
+.contact-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(270px,.72fr);gap:26px;align-items:start}
+.contact-card{min-width:0;background:#fff;border:1px solid #e0e7db;border-radius:18px;padding:clamp(20px,3.5vw,42px);box-shadow:0 9px 32px rgba(26,55,32,.035)}
+.contact-form{display:grid;gap:18px}
+.contact-form>h2{font-size:1.65rem;margin:0}
+.contact-form>p{margin:-9px 0 4px;color:#748275;line-height:1.7}
+.contact-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.contact-form .field{width:100%;min-width:0}
+.contact-form .field textarea{min-height:148px;resize:vertical}
+.contact-form .field select{width:100%;appearance:none;background:#fbfcf9;border:1px solid #dfe6dc;color:#243827;padding:14px 40px 14px 13px;border-radius:9px;font:inherit;font-size:.9rem}
+.contact-form .button{justify-self:start}
+.contact-honeypot{position:absolute!important;width:1px;height:1px;overflow:hidden;clip-path:inset(100%);white-space:nowrap;pointer-events:none}
+.contact-error{color:#94362b!important;background:#fff0ed;border:1px solid #f4d9d2;border-radius:9px;padding:12px!important;font-size:.85rem}
+.contact-error a,.policy-body a{color:#326b43;text-decoration:underline;text-underline-offset:3px}
+.contact-success{display:grid;gap:18px;justify-items:start;padding:42px 10px}
+.contact-success svg{color:#5b965e}
+.contact-success h2{margin:0}
+.contact-success p{color:#66796b;line-height:1.8}
+.contact-aside{display:grid;gap:15px;min-width:0}
+.contact-info-card{background:#eef4e9;border:1px solid #dce8d5;padding:25px;border-radius:15px;min-width:0}
+.contact-info-card>svg{color:#65915d;margin-bottom:10px}
+.contact-info-card h3{font-size:1.12rem;margin:0 0 10px}
+.contact-info-card p{color:#6e806e;font-size:.85rem;line-height:1.75;margin:10px 0 0}
+.contact-info-card>a{color:#2e6341;font-weight:800;overflow-wrap:anywhere;display:inline-flex;gap:6px;align-items:center;line-height:1.6}
+.contact-setting-note{font-size:.77rem;color:#798777;line-height:1.7;margin:0 4px}
+.store-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:19px}
+.store-info-card{background:white;padding:32px;border:1px solid #e3e9df;border-radius:16px;min-width:0}
+.store-info-card h2{font-size:1.5rem;margin:16px 0 8px}
+.store-info-card p{color:#718171;font-size:.86rem;line-height:1.7}
+.policy-card-cta{display:inline-flex;align-items:center;gap:6px;margin-top:14px;color:#3d7147;font-weight:800;font-size:.82rem}
+.policy-layout{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:40px;align-items:start}
+.policy-body{display:grid;gap:17px;min-width:0}
+.policy-body section{background:#fff;border:1px solid #e1e7de;border-radius:14px;padding:clamp(21px,3vw,30px);min-width:0}
+.policy-body section h2{font-size:clamp(1.15rem,2vw,1.45rem);display:flex;align-items:center;gap:12px;margin:0 0 17px}
+.policy-body section h2 svg{color:#64925b;flex:none}
+.policy-body section p{color:#637667;font-size:.93rem;line-height:1.9;overflow-wrap:anywhere}
+.policy-body section p:last-child{margin-bottom:0}
+.policy-sidebar{position:sticky;top:104px;background:#eef4e9;border-radius:14px;padding:24px}
+.policy-sidebar h3{font-size:1.1rem;margin:0 0 15px}
+.policy-side-link{border-top:1px solid #d8e3d2;padding:13px 0;display:grid;gap:6px}
+.policy-side-link b{font-size:.84rem;color:#285138}
+.policy-side-link small,.policy-sidebar p{font-size:.76rem;color:#788877;line-height:1.65}
+.policy-sidebar p{margin:12px 0 0}
+@media(max-width:1100px){
+  .account-layout{grid-template-columns:minmax(0,1fr);gap:22px}
+  .account-nav{min-width:0;display:grid;gap:12px;padding:14px}
+  .account-identity{margin-bottom:0;padding:7px 8px 14px}
+  .account-nav nav{display:flex;gap:7px;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:5px 2px 10px;scrollbar-width:thin;scroll-snap-type:x proximity}
+  .account-nav nav button{width:auto;white-space:nowrap;min-width:max-content;flex:none;scroll-snap-align:start;padding:12px 15px;font-size:.79rem}
+  .account-nav nav button:last-child{display:flex}
+  .account-content{min-width:0;width:100%}
+  .account-products{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .policy-layout{grid-template-columns:minmax(0,1fr) 225px;gap:24px}
+}
+@media(max-width:960px){
+  .header-preview-menus{gap:11px}
+  .header-preview-portal{border-radius:15px;box-shadow:0 22px 65px #142c1c33}
+  .header-preview-portal .preview-item{min-width:0}
+  .contact-layout{grid-template-columns:minmax(0,1fr) minmax(240px,.66fr)}
+  .policy-layout{grid-template-columns:1fr;gap:20px}
+  .policy-sidebar{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 15px}
+  .policy-sidebar h3,.policy-sidebar p{grid-column:1/-1}
+}
+@media(max-width:800px){
+  .contact-layout{grid-template-columns:1fr}
+  .contact-aside{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .contact-setting-note{grid-column:1/-1}
+  .account-stat-grid{gap:11px}
+  .account-section,.settings-stack,.settings-stack .form-card{min-width:0}
+  .order-card{min-width:0}
+  .order-images{min-width:0}
+  .order-card-actions{display:flex;flex-wrap:wrap}
+}
+@media(max-width:640px){
+  .account-layout{gap:17px}
+  .account-nav nav button{font-size:.72rem;padding:11px 12px}
+  .account-identity strong{overflow-wrap:anywhere}
+  .account-welcome{padding:21px}
+  .account-welcome h2{font-size:clamp(1.45rem,7vw,1.85rem)}
+  .account-star{font-size:9rem}
+  .account-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .account-stat-grid button{min-width:0;padding:15px}
+  .account-stat-grid button:last-child{grid-column:1/-1}
+  .account-stat-grid strong{font-size:1.55rem}
+  .account-section h2{font-size:1.35rem}
+  .account-products{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .heading-row{align-items:stretch;flex-direction:column}
+  .heading-row .button{width:100%}
+  .order-card{padding:14px}
+  .order-card-top{gap:9px;flex-wrap:wrap}
+  .order-card-top .eyebrow{font-size:.62rem;overflow-wrap:anywhere}
+  .order-images{display:flex;flex-wrap:wrap;gap:9px}
+  .order-images img{width:46px;height:48px}
+  .order-images img:nth-of-type(n+3){display:none}
+  .order-images>div{flex:1 1 120px}
+  .order-images b{white-space:normal;line-height:1.4}
+  .order-images strong{flex:1 0 100%;text-align:right}
+  .order-card-actions .button{width:100%;white-space:normal;text-align:center;min-height:44px}
+  .address-card,.address-editor,.form-card{padding:17px}
+  .address-card-head{flex-wrap:wrap}
+  .form-grid{grid-template-columns:1fr}
+  .form-grid>*{grid-column:1/-1;min-width:0}
+  .form-actions{flex-direction:column-reverse;align-items:stretch}
+  .form-actions button{width:100%}
+  .settings-stack .form-card .button{justify-self:stretch}
+  .store-info-grid,.contact-aside,.contact-fields{grid-template-columns:1fr}
+  .contact-card{padding:20px}
+  .contact-form .button{width:100%}
+  .contact-info-card{padding:21px}
+  .policy-sidebar{grid-template-columns:1fr}
+  .policy-body section{padding:20px}
+  .header-search{flex-wrap:wrap;gap:8px}
+  .header-search input{flex:1 1 150px}
+  .header-search .button{padding:11px;flex:0 0 auto}
+  .dropdown-portal{max-width:calc(100vw - 18px)}
+}
+@media(max-width:390px){
+  .account-stat-grid{grid-template-columns:1fr}
+  .account-stat-grid button:last-child{grid-column:auto}
+  .account-products{grid-template-columns:1fr}
+  .header-preview-panel.header-preview-portal{padding:17px}
+}
+@media print{.header-menu-backdrop,.header-preview-portal,.contact-form .button{display:none!important}}

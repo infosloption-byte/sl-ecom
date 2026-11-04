@@ -16,8 +16,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from './db.js';
 import { optionalAuth, requireAuth, requireAdmin, startSession, signOut, verifyGoogleCredential } from './auth.js';
 import { asyncRoute as route, error, orderNumber, publicUser, shippingFor, slugify, token, sha256 } from './utils.js';
-import { mailEnabled, sendResetEmail, sendOrderEmails } from './mail.js';
-import { addressSchema, email, password, productSchema, settingsSchema } from './validators.js';
+import { mailEnabled, sendResetEmail, sendOrderEmails, sendContactMail } from './mail.js';
+import { addressSchema, email, password, productSchema, settingsSchema, contactSchema } from './validators.js';
 import { validateStatusChange } from './orderTracking.js';
 
 const app = express();
@@ -64,6 +64,21 @@ app.get('/api/settings', route(async (_req, res) => {
   if (!store) throw error(503, 'Store has not been initialized. Run the seed command.');
   res.json(store);
 }));
+// Public store enquiries are rate-limited and delivered only to the configured store inbox.
+const contactLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders:'draft-7',
+  legacyHeaders:false, message:{error:'Too many contact requests. Please try again later.'} });
+app.post('/api/contact', contactLimit, route(async (req, res) => {
+  const input = contactSchema.parse(req.body);
+  if (input.website) return res.status(202).json({ok:true});
+  if (!mailEnabled()) throw error(503, 'Contact email is not configured. Please use the store email address.');
+  const store = await prisma.storeSettings.findUnique({ where:{id:'main'}, select:{contactEmail:true} });
+  const destination = process.env.CONTACT_ALERT_EMAIL || process.env.ORDER_ALERT_EMAIL || store?.contactEmail;
+  if (!destination) throw error(503, 'Store contact email is not configured.');
+  try { await sendContactMail(input, destination); }
+  catch (err) { console.error('Contact delivery failed:', err.message); throw error(503, 'Message delivery is temporarily unavailable. Please email the store directly.'); }
+  res.status(202).json({ok:true});
+}));
+
 app.get('/api/categories', route(async (_req, res) => {
   const categories = await prisma.category.findMany({ where: { active: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
   res.json(categories);

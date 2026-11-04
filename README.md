@@ -179,6 +179,37 @@ Without SMTP, checkout and order management work but emails are **not sent**, an
 5. Customer browses, adds to cart, signs in/creates account, adds delivery address and confirms cash-on-delivery order.
 6. Admin reviews and fulfils the order in Admin > Orders. Changing an order to CANCELLED returns reserved stock; cancelled orders cannot be reopened. **PAID** should only be selected when payment has genuinely been collected.
 
+## Store information pages and responsive navigation
+
+This batch adds the public pages:
+
+- `/contact` — customer contact form and store support links.
+- `/shipping-returns` — delivery charges, COD, order tracking, and return contact procedure.
+- `/privacy` — customer account/order data use, cookies, retention and enquiries.
+- `/terms` — store/account, prices, orders and shopping terms.
+- `/policies` — index linking to all four pages for backward compatibility.
+
+**Contact email setup:** the Contact form posts to `POST /api/contact`, with Zod field validation, an IP-based limit of five requests per fifteen minutes and a hidden honeypot. It forwards valid enquiries as plain-text email using the SMTP settings already described above. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM`. The destination defaults to `CONTACT_ALERT_EMAIL`, then `ORDER_ALERT_EMAIL`, then the editable `StoreSettings.contactEmail`. Only the store receives the message. If SMTP is not configured, the API returns a clear 503 error and the page provides a direct email link. No contact-message database table was added.
+
+Example optional environment configuration:
+
+```dotenv
+CONTACT_ALERT_EMAIL=your-store-inbox@example.com
+```
+
+Do not use an unverified placeholder inbox before launch. The default store email in the seed data is a sample; set the real merchant support email from Admin → Store settings.
+
+**Legal and policy review:** these pages are carefully scoped drafts for this Sri Lankan single-merchant store, not a substitute for professional review. Confirm merchant legal identity/contact information, actual courier/service restrictions, shipping turnaround, returns eligibility and window, product-specific warranties, and refund arrangements before accepting public orders. Preserve consumer rights and ensure the published terms match operations. Sri Lanka's Consumer Affairs Authority online commerce direction (Gazette dated 17 May 2023) requires transparent business information, order/delivery information and privacy safeguards. The Personal Data Protection Act No. 9 of 2022 was amended in 2025 and its operation is phased according to gazette orders; check current DPA guidance before launch.
+
+Useful official sources:
+- https://caa.gov.lk/web/images/Direction/English/sec10/91_E.pdf
+- https://www.dpa.gov.lk/notice.php
+- https://www.dpa.gov.lk/guidelines.php
+
+**Navigation fix:** a route-aware ScrollManager opens new pages at the top and preserves anchor targets. The themed dropdown component now scrolls its list internally rather than invoking global `scrollIntoView`. Account, wishlist and cart previews use a viewport portal; they center under the sticky top bar on tablets/phones and remain fully scrollable. The account, orders, forms, invoices, contact and policy layouts are responsive.
+
+Run `npm test`, `npm run build`, `npm audit`, `npm run dev` and the browser checks in `QA_CHECKLIST.md` on port 5180. **No database migration or reset is required for this batch.**
+
 ## Production deployment notes
 
 Run the backend and built frontend under the **same HTTPS origin** if possible:

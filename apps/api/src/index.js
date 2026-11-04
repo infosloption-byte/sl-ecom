@@ -243,6 +243,7 @@ app.post('/api/cart/sync', requireAuth, route(async (req, res) => {
     const quantity = Math.min((existing?.quantity || 0) + item.quantity, product.stock, 10);
     if (quantity < 1) continue;
     await prisma.cartItem.upsert({ where: { userId_productId: { userId: req.user.id, productId: item.productId } }, update: { quantity }, create: { userId: req.user.id, productId: item.productId, quantity } });
+    if(req.cookies?.slm_analytics_disabled!=='1')await recordEvent(prisma,{type:'CART_ADD',productId:item.productId,userId:req.user.id}).catch(err=>console.error('Cart sync analytics failed:',err.message));
   }
   res.json({ ok: true });
 }));

@@ -90,6 +90,7 @@ app.post('/api/analytics/event', analyticsLimiter, route(async (req,res)=>{
     visitorId:z.string().uuid()
   }).strict().parse(req.body);
   // Admin browsing does not count as customer engagement; authenticated cart adds are logged by the cart API.
+  if(req.cookies?.slm_analytics_disabled==='1')return res.status(202).json({ok:true});
   if(req.user?.role==='ADMIN'||(req.user && input.type==='CART_ADD')||(!req.user&&input.type==='CHECKOUT_START'))
     return res.status(202).json({ok:true});
   const product=await prisma.product.findFirst({where:{id:input.productId,status:'ACTIVE'},select:{id:true}});
@@ -230,7 +231,7 @@ app.post('/api/cart', requireAuth, route(async (req, res) => {
   const nextQuantity = (existing?.quantity || 0) + quantity;
   if (nextQuantity > Math.min(10, product.stock)) throw error(409, 'Not enough stock for the requested quantity.');
   await prisma.cartItem.upsert({ where: { userId_productId: { userId: req.user.id, productId } }, update: { quantity: nextQuantity }, create: { userId: req.user.id, productId, quantity: nextQuantity } });
-  await recordEvent(prisma,{type:'CART_ADD',productId,userId:req.user.id}).catch(err=>console.error('Cart analytics failed:',err.message));
+  if(req.cookies?.slm_analytics_disabled!=='1')await recordEvent(prisma,{type:'CART_ADD',productId,userId:req.user.id}).catch(err=>console.error('Cart analytics failed:',err.message));
   res.json({ ok: true });
 }));
 app.post('/api/cart/sync', requireAuth, route(async (req, res) => {
@@ -267,7 +268,7 @@ app.post('/api/wishlist/:productId', requireAuth, route(async (req, res) => {
   const product = await prisma.product.findUnique({ where: { id: req.params.productId } });
   if (!product || product.status !== 'ACTIVE') throw error(404, 'Product unavailable.');
   await prisma.wishlistItem.upsert({ where: { userId_productId: { userId: req.user.id, productId: product.id } }, create: { userId: req.user.id, productId: product.id }, update: {} });
-  await recordEvent(prisma,{type:'WISHLIST_ADD',productId:product.id,userId:req.user.id}).catch(err=>console.error('Wishlist analytics failed:',err.message));
+  if(req.cookies?.slm_analytics_disabled!=='1')await recordEvent(prisma,{type:'WISHLIST_ADD',productId:product.id,userId:req.user.id}).catch(err=>console.error('Wishlist analytics failed:',err.message));
   res.json({ ok: true });
 }));
 app.delete('/api/wishlist/:productId', requireAuth, route(async (req, res) => {

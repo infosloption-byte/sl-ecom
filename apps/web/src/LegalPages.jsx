@@ -5,6 +5,8 @@ import { api, lkr } from './api';
 import { useStore } from './context';
 import { Dropdown, Field, PageHeading, TextAreaField } from './components';
 
+const contactTopics = ['Order question','Product enquiry','Delivery or tracking','Return or refund','Other'].map(topic=>({value:topic,label:topic}));
+
 const legalLinks = [
   { to:'/shipping-returns', label:'Shipping & returns', detail:'Delivery, COD, returns and refunds' },
   { to:'/privacy', label:'Privacy policy', detail:'How your information is handled' },
@@ -99,7 +101,7 @@ export function ContactPage() {
         : <form onSubmit={submit} className="contact-form">
           <h2>Send a message</h2><p>We recommend including your order number for delivery or return enquiries.</p>
           <div className="contact-fields"><Field label="Your name" required maxLength={120} autoComplete="name" value={form.name} onChange={e=>change('name',e.target.value)}/><Field label="Email address" type="email" required maxLength={191} autoComplete="email" value={form.email} onChange={e=>change('email',e.target.value)}/></div>
-          <Dropdown label="What is this about?" value={form.topic} options={['Order question','Product enquiry','Delivery or tracking','Return or refund','Other'].map(topic=>({value:topic,label:topic}))} onChange={topic=>change('topic',topic)}/>
+          <Dropdown label="What is this about?" value={form.topic} options={contactTopics} onChange={topic=>change('topic',topic)}/>
           <Field label="Order number (optional)" maxLength={40} value={form.orderNumber} onChange={e=>change('orderNumber',e.target.value)} placeholder="e.g. SLM-..."/>
           <TextAreaField label="How can we help?" required minLength={10} maxLength={3000} rows={6} value={form.message} onChange={e=>change('message',e.target.value)} placeholder="Tell us a little about your enquiry..."/>
           <div className="contact-honeypot" aria-hidden="true"><label>Website <input tabIndex={-1} autoComplete="off" value={form.website} onChange={e=>change('website',e.target.value)}/></label></div>

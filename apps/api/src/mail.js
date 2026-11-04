@@ -29,3 +29,28 @@ export async function sendOrderEmails(order, user) {
   const outcomes = await Promise.allSettled(outgoing);
   for (const result of outcomes) if (result.status === 'rejected') console.error('Order email failed:', result.reason?.message);
 }
+
+/** Forward a customer enquiry to the configured store inbox (never to an arbitrary recipient). */
+export async function sendContactMail({ name, email, topic, orderNumber, message }, destination) {
+  if (!mailEnabled()) throw new Error('Store email is not configured.');
+  const text = [
+    'New SL Options Market contact request',
+    'From: ' + name + ' (' + email + ')',
+    'Topic: ' + topic,
+    'Order number: ' + (orderNumber || 'Not supplied'),
+    '',
+    message
+  ].join('\n');
+  const client = transport();
+  try {
+    await client.sendMail({
+      from: process.env.SMTP_FROM,
+      to: destination,
+      replyTo: { name, address: email },
+      subject: 'Store enquiry · ' + topic,
+      text,
+      disableFileAccess: true,
+      disableUrlAccess: true
+    });
+  } finally { client.close(); }
+}

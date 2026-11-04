@@ -220,6 +220,10 @@ Files: `apps/web/src/preloader.css`, `AppPreloader.jsx`, `index.html`, `App.jsx`
 
 From the feature branch, run `npm ci`, `npm test`, `npm run build` and `npm run dev`; verify initial loads and slow-network behaviour at `http://localhost:5180`, plus the preloader checklist in `QA_CHECKLIST.md`.
 
+## Customer and product analytics
+
+A privacy-aware first-party analytics dashboard is available at **Admin → Analytics**, with 7/30/90-day item views, clicks, wishlist/cart signals, checkout entries, non-cancelled orders and COD receipts, customer-item interest drilldowns, CSV export, and an overview shortcut. It uses the additive `ProductEvent` MySQL migration and requires no analytics SaaS. See [ANALYTICS_REPORTING.md](ANALYTICS_REPORTING.md) for data definitions, user privacy controls, 90-day retention and WAMP migration/testing steps. The root `predev` hook runs Prisma generation automatically before development servers start.
+
 ## Production deployment notes
 
 Run the backend and built frontend under the **same HTTPS origin** if possible:

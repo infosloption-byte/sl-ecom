@@ -9,6 +9,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/preloader.css" />
   </head>
-  <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
+  <body>
+    <div id="root">
+      <!-- First paint while the React bundle loads. React replaces this with the managed loader. -->
+      <div class="market-loader" role="status" aria-label="Loading SL Options Market">
+        <div class="market-loader__content">
+          <div class="market-loader__emblem" aria-hidden="true">
+            <span class="market-loader__orbit"></span>
+            <span class="market-loader__orbit market-loader__orbit--inner"></span>
+            <span class="market-loader__symbol"><b>s</b><i>✳</i></span>
+          </div>
+          <p class="market-loader__name">SL OPTIONS <span>MARKET</span></p>
+          <p class="market-loader__caption">Thoughtful finds, just for you.</p>
+          <div class="market-loader__track" aria-hidden="true"><span class="market-loader__bar"></span></div>
+        </div>
+        <span class="market-loader__foot">MADE FOR SRI LANKA · AN SL OPTIONS STORE</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

@@ -210,6 +210,16 @@ Useful official sources:
 
 Run `npm test`, `npm run build`, `npm audit`, `npm run dev` and the browser checks in `QA_CHECKLIST.md` on port 5180. **No database migration or reset is required for this batch.**
 
+## Frontend loading animation
+
+The React storefront has an SL Options Market branded **first-paint preloader**. The initial HTML displays the animated emblem, text and indeterminate progress accent before the React bundle starts; `AppPreloader.jsx` renders the matching overlay during initial account/session restoration. It fades out automatically as soon as the store is ready — there is no artificial minimum loading duration. A nine-second safety timeout prevents indefinitely blocking the interface if initial network requests stall.
+
+The animation uses lightweight CSS only (no image downloads or animation libraries). It respects `prefers-reduced-motion: reduce`. Existing async page `Spinner` components now use a matching small brand emblem, without showing the full-screen preloader during every route change.
+
+Files: `apps/web/src/preloader.css`, `AppPreloader.jsx`, `index.html`, `App.jsx` and `components.jsx`. There are no database or backend changes.
+
+From the feature branch, run `npm ci`, `npm test`, `npm run build` and `npm run dev`; verify initial loads and slow-network behaviour at `http://localhost:5180`, plus the preloader checklist in `QA_CHECKLIST.md`.
+
 ## Production deployment notes
 
 Run the backend and built frontend under the **same HTTPS origin** if possible:

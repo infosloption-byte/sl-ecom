@@ -26,7 +26,16 @@ export function Dropdown({ value, options, onChange, placeholder = 'Select...', 
     measure(); window.addEventListener('resize', measure); window.addEventListener('scroll', measure, true);
     return () => { window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true); };
   }, [open, options.length]);
-  useEffect(() => { if (open) itemRefs.current[active]?.scrollIntoView({ block: 'nearest' }); }, [open, active, placement]);
+  useEffect(() => {
+    // scrollIntoView also scrolls ancestor pages on some browsers. Keep focus inside the dropdown list.
+    if (!open || !pop.current || !itemRefs.current[active]) return;
+    const list = pop.current;
+    const option = itemRefs.current[active];
+    const listRect = list.getBoundingClientRect();
+    const itemRect = option.getBoundingClientRect();
+    if (itemRect.top < listRect.top) list.scrollTop -= listRect.top - itemRect.top;
+    else if (itemRect.bottom > listRect.bottom) list.scrollTop += itemRect.bottom - listRect.bottom;
+  }, [open, active, placement]);
   function keyDown(e) {
     if (e.key === 'Escape') { setOpen(false); return; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!open) setOpen(true); else setActive(n => (n + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length); }

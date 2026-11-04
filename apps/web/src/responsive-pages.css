@@ -58,6 +58,7 @@ body,#root,.site-shell{max-width:100%;min-width:0}
   .account-identity{margin-bottom:0;padding:7px 8px 14px}
   .account-nav nav{display:flex;gap:7px;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:5px 2px 10px;scrollbar-width:thin;scroll-snap-type:x proximity}
   .account-nav nav button{width:auto;white-space:nowrap;min-width:max-content;flex:none;scroll-snap-align:start;padding:12px 15px;font-size:.79rem}
+  .account-nav nav button:last-child{display:flex}
   .account-content{min-width:0;width:100%}
   .account-products{grid-template-columns:repeat(3,minmax(0,1fr))}
   .policy-layout{grid-template-columns:minmax(0,1fr) 225px;gap:24px}

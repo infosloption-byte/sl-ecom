@@ -25,4 +25,12 @@ export const settingsSchema = z.object({
   storeName: required(120), announcement: z.string().trim().max(200), contactEmail: email,
   shippingFlatCents: z.number().int().min(0).max(1000000), freeShippingFromCents: z.number().int().min(0).max(100000000)
 }).strict();
+export const contactSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email,
+  topic: z.enum(['Order question','Product enquiry','Delivery or tracking','Return or refund','Other']),
+  orderNumber: z.string().trim().max(40).optional().default(''),
+  message: z.string().trim().min(10).max(3000),
+  website: z.string().max(120).optional().default('')
+}).strict();
 export const idString = z.string().min(5).max(100);

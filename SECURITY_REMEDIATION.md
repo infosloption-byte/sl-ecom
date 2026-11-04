@@ -73,6 +73,26 @@ npm run audit:prod
 
 Verify that `deepmerge-ts@8.0.2` is actually installed and that the vulnerable 7.x version is absent before concluding the issue is fixed. If it is still 7.x, gather `npm --version`, `npm pkg get overrides`, `npm explain deepmerge-ts`, and `npm ls deepmerge-ts --all` for diagnosis; do not escalate to `npm audit fix --force` or Prisma 7. **Do not merge the PR** until WAMP smoke tests, the audit and lockfile are verified. The updated lockfile should be committed to this branch only after a passing installation.
 
+## Clean reinstall confirmation and npm 11 ELSPROBLEMS caveat
+
+Verified from the user's local Windows/WAMP results on Nov 4, 2026:
+
+- A fresh `npm install` with deleted previous lockfile and `node_modules` reported **0 vulnerabilities**.
+- Both `npm audit` and `npm run audit:prod` reported **0 vulnerabilities**.
+- `prisma generate` succeeded on Prisma 6.19.3; all **11/11** tests passed; Vite production build passed.
+- `npm ls deepmerge-ts` found the corrected `deepmerge-ts@8.0.2`, but exited `ELSPROBLEMS` and printed `invalid: "7.1.5" from node_modules/@prisma/config`.
+
+This does **not** mean that the vulnerable 7.1.5 package was installed. Prisma's `@prisma/config@6.19.3` declares an exact 7.1.5 dependency, while our root override installs 8.0.2 instead. npm 11 has an open workspaces/overrides issue in which `npm ls` incorrectly reports deliberately overridden packages as `invalid`, and may revert the override during subsequent npm upgrade operations: https://github.com/npm/cli/issues/9514. Avoid `npm upgrade` or `npm audit fix --force` until the upstream package is patched. Track Prisma's upstream issue: https://github.com/prisma/orm/issues/30052.
+
+**Resolution:** Treat the 8.0.2 version confirmed by the clean install, clear `npm audit` output, passing tests/build and Prisma checks as evidence of the intended security mitigation. Do **not** repeatedly delete modules because `npm ls` shows `invalid`: the warning can remain with npm 11 and a forced incompatible range. For future verification, run `npm --version`, `node -p "require('./node_modules/deepmerge-ts/package.json').version"`, `npm audit`, and `npm run audit:prod`; verify no nested 7.x package is present in the lockfile.
+
+**Remaining gates before merge:**
+
+1. Commit the fresh, working root `package-lock.json` to this security branch (it was generated on the user's machine).
+2. Verify `npm ci` and the Prisma validation/test/build/audit using that committed lockfile.
+3. Smoke test live flows against WAMP MySQL: customer registration/login, add-to-cart and cash-on-delivery checkout, admin order visibility/fulfillment, stock updates, and a product image upload. Google sign-in and SMTP require configured credentials.
+4. Once all gates pass, merge this **draft** PR to `main`. Neither the audit nor these unit tests alone proves the store is production-ready.
+
 ## Lockfile
 
 The repository was created without a committed `package-lock.json`. `npm install` will generate/update it. After tests pass, commit the generated lockfile on this branch so the reviewed dependency graph can be reproduced with `npm ci` in CI/deployment.

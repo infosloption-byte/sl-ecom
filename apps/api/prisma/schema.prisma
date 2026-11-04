@@ -33,6 +33,14 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum ProductEventType {
+  CLICK
+  VIEW
+  CART_ADD
+  WISHLIST_ADD
+  CHECKOUT_START
+}
+
 model User {
   id           String      @id @default(cuid()) @db.VarChar(64)
   email        String      @unique @db.VarChar(191)
@@ -49,6 +57,7 @@ model User {
   cart         CartItem[]
   wishlist     WishlistItem[]
   orders       Order[]
+  productEvents ProductEvent[]
 }
 
 model Session {
@@ -118,6 +127,7 @@ model Product {
   category       Category      @relation(fields: [categoryId], references: [id])
   cartItems      CartItem[]
   wishlistItems  WishlistItem[]
+  productEvents ProductEvent[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   @@index([status, createdAt])
@@ -191,6 +201,24 @@ model OrderItem {
   quantity       Int
   lineTotalCents Int
   order          Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+
+/** First-party behaviour events for 90-day store analytics; never stores IP or UA. */
+model ProductEvent {
+  id        String           @id @default(cuid()) @db.VarChar(64)
+  productId String           @db.VarChar(64)
+  userId    String?          @db.VarChar(64)
+  visitorId String?          @db.VarChar(36)
+  type      ProductEventType
+  dedupeKey String?          @unique @db.Char(64)
+  createdAt DateTime         @default(now())
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([productId, createdAt])
+  @@index([type, createdAt])
+  @@index([userId, productId, createdAt])
+  @@index([visitorId, createdAt])
 }
 
 model StoreSettings {

@@ -9,6 +9,7 @@ CREATE TABLE `ProductEvent` (
   `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   UNIQUE INDEX `ProductEvent_dedupeKey_key` (`dedupeKey`),
   INDEX `ProductEvent_productId_createdAt_idx` (`productId`,`createdAt`),
+  INDEX `ProductEvent_createdAt_idx` (`createdAt`),
   INDEX `ProductEvent_type_createdAt_idx` (`type`,`createdAt`),
   INDEX `ProductEvent_userId_productId_createdAt_idx` (`userId`,`productId`,`createdAt`),
   INDEX `ProductEvent_visitorId_createdAt_idx` (`visitorId`,`createdAt`),

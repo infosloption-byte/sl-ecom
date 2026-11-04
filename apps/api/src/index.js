@@ -18,6 +18,7 @@ import { optionalAuth, requireAuth, requireAdmin, startSession, signOut, verifyG
 import { asyncRoute as route, error, orderNumber, publicUser, shippingFor, slugify, token, sha256 } from './utils.js';
 import { mailEnabled, sendResetEmail, sendOrderEmails } from './mail.js';
 import { addressSchema, email, password, productSchema, settingsSchema } from './validators.js';
+import { validateStatusChange } from './orderTracking.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -238,12 +239,12 @@ app.delete('/api/wishlist/:productId', requireAuth, route(async (req, res) => {
   res.json({ ok: true });
 }));
 
-const orderInclude = { items: true };
+const orderInclude = { items: true, statusEvents: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] } };
 app.get('/api/orders', requireAuth, route(async (req, res) => {
   res.json(await prisma.order.findMany({ where: { userId: req.user.id }, include: orderInclude, orderBy: { createdAt: 'desc' }, take: 100 }));
 }));
 app.get('/api/orders/:id', requireAuth, route(async (req, res) => {
-  const order = await prisma.order.findFirst({ where: { id: req.params.id, userId: req.user.id }, include: orderInclude });
+  const order = await prisma.order.findFirst({ where: { id: req.params.id, userId: req.user.id }, include: { ...orderInclude, user: { select: { name: true, email: true } } } });
   if (!order) throw error(404, 'Order not found.');
   res.json(order);
 }));
@@ -271,6 +272,7 @@ app.post('/api/checkout', requireAuth, route(async (req, res) => {
     const created = await tx.order.create({ data: {
       number: orderNumber(), checkoutKey: input.checkoutKey, userId: req.user.id, subtotalCents, shippingCents, totalCents: subtotalCents + shippingCents,
       address: input.address, note: input.note, paymentMethod: 'COD',
+      statusEvents: { create: { status: 'PLACED', createdBy: 'Store' } },
       items: { create: entries.map(e => ({ productId: e.productId, title: e.product.title, imageUrl: e.product.imageUrl, unitPriceCents: e.product.priceCents, quantity: e.quantity, lineTotalCents: e.product.priceCents * e.quantity })) }
     }, include: orderInclude });
     if (input.saveAddress) {
@@ -297,16 +299,25 @@ admin.get('/overview', route(async (_req, res) => {
   res.json({ products, customers, orders, orderValueCents: total._sum.totalCents || 0, recent });
 }));
 admin.get('/products', route(async (_req, res) => res.json(await prisma.product.findMany({ include: { category: true }, orderBy: { createdAt: 'desc' }, take: 500 }))));
+admin.get('/products/:id', route(async (req, res) => {
+  const product = await prisma.product.findUnique({ where: { id: req.params.id }, include: { category: true } });
+  if (!product) throw error(404, 'Product not found.');
+  res.json(product);
+}));
+function normalizedProduct(input) {
+  const images = [...new Set(input.images.length ? input.images : input.imageUrl ? [input.imageUrl] : [])];
+  return { ...input, images, imageUrl: images[0] || input.imageUrl || '', shortDescription: input.shortDescription || null, sku: input.sku || null };
+}
 admin.post('/products', route(async (req, res) => {
   const input = productSchema.parse(req.body);
   if (input.compareAtCents != null && input.compareAtCents <= input.priceCents) throw error(400, 'Compare-at price must exceed the selling price.');
-  const product = await prisma.product.create({ data: { ...input, slug: input.slug || slugify(input.title) || `item-${randomUUID().slice(0, 8)}` } });
+  const product = await prisma.product.create({ data: { ...normalizedProduct(input), slug: input.slug || slugify(input.title) || `item-${randomUUID().slice(0, 8)}` } });
   res.status(201).json(product);
 }));
 admin.put('/products/:id', route(async (req, res) => {
   const input = productSchema.parse(req.body);
   if (input.compareAtCents != null && input.compareAtCents <= input.priceCents) throw error(400, 'Compare-at price must exceed the selling price.');
-  const product = await prisma.product.update({ where: { id: req.params.id }, data: { ...input, ...(input.slug ? { slug: input.slug } : {}) } });
+  const product = await prisma.product.update({ where: { id: req.params.id }, data: { ...normalizedProduct(input), ...(input.slug ? { slug: input.slug } : {}) } });
   res.json(product);
 }));
 admin.delete('/products/:id', route(async (req, res) => {
@@ -329,18 +340,37 @@ admin.delete('/categories/:id', route(async (req, res) => {
   res.json({ ok: true });
 }));
 admin.get('/orders', route(async (_req, res) => res.json(await prisma.order.findMany({ include: { items: true, user: { select: { name: true, email: true, phone: true } } }, orderBy: { createdAt: 'desc' }, take: 500 }))));
+admin.get('/orders/:id', route(async (req, res) => {
+  const order = await prisma.order.findUnique({ where: { id: req.params.id }, include: { ...orderInclude, user: { select: { name: true, email: true, phone: true } } } });
+  if (!order) throw error(404, 'Order not found.');
+  res.json(order);
+}));
 admin.patch('/orders/:id', route(async (req, res) => {
   const { status, paymentStatus } = z.object({ status: z.enum(['PLACED','CONFIRMED','PACKED','SHIPPED','DELIVERED','CANCELLED']), paymentStatus: z.enum(['PENDING','PAID','FAILED','REFUNDED']) }).strict().parse(req.body);
   const updated = await prisma.$transaction(async tx => {
     const current = await tx.order.findUnique({ where: { id: req.params.id }, include: { items: true } });
     if (!current) throw error(404, 'Order not found.');
-    if (current.status === 'CANCELLED' && status !== 'CANCELLED') throw error(409, 'Cancelled orders cannot be reopened.');
+    if (!validateStatusChange(current.status, status)) throw error(409, 'Order status cannot go backwards; shipped and delivered orders cannot be cancelled here.');
     if (status === 'CANCELLED' && current.status !== 'CANCELLED') {
       for (const item of current.items) await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
     }
-    return tx.order.update({ where: { id: current.id }, data: { status, paymentStatus } });
+    return tx.order.update({ where: { id: current.id }, data: { status, paymentStatus, ...(status !== current.status ? { statusEvents: { create: { status, createdBy: req.user.name.slice(0, 120) } } } : {}) } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   res.json(updated);
+}));
+admin.patch('/orders/:id/tracking', route(async (req, res) => {
+  const input = z.object({
+    courierName: z.string().trim().max(120).nullable().optional(),
+    trackingNumber: z.string().trim().max(120).nullable().optional(),
+    trackingUrl: z.string().trim().max(500).refine(v => !v || /^https:\/\//i.test(v), 'Tracking link must use HTTPS').nullable().optional(),
+    estimatedDeliveryAt: z.string().datetime({ offset: true }).nullable().optional()
+  }).strict().parse(req.body);
+  const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+  if (!order) throw error(404, 'Order not found.');
+  res.json(await prisma.order.update({ where: { id: order.id }, data: {
+    ...Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'estimatedDeliveryAt').map(([k, v]) => [k, v || null])),
+    ...(Object.prototype.hasOwnProperty.call(input, 'estimatedDeliveryAt') ? { estimatedDeliveryAt: input.estimatedDeliveryAt ? new Date(input.estimatedDeliveryAt) : null } : {})
+  } }));
 }));
 admin.get('/customers', route(async (_req, res) => res.json(await prisma.user.findMany({ where: { role: 'CUSTOMER' }, select: { id: true, name: true, email: true, phone: true, createdAt: true, _count: { select: { orders: true } } }, orderBy: { createdAt: 'desc' }, take: 500 }))));
 admin.put('/settings', route(async (req, res) => {

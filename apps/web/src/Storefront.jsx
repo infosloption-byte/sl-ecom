@@ -5,6 +5,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronRight, He
 import { api, dateText, districts, emptyAddress, lkr } from './api';
 import { useStore } from './context';
 import { Dropdown, EmptyState, Field, PageHeading, Price, ProductCard, Quantity, Spinner, TextAreaField } from './components';
+import { ProductGallery } from './ProductGallery';
 
 const shippingEstimate = (subtotal, settings) => settings ? (subtotal >= settings.freeShippingFromCents ? 0 : settings.shippingFlatCents) : 0;
 
@@ -55,16 +56,27 @@ export function Shop() {
 }
 
 export function ProductDetail() {
-  const { slug } = useParams(); const [product, setProduct] = useState(null); const [loading, setLoading] = useState(true); const [quantity, setQuantity] = useState(1); const [busy, setBusy] = useState(false);
-  const { addToCart, toggleWishlist, wishlist, user, notify } = useStore(); const navigate = useNavigate();
-  useEffect(() => { setLoading(true); api(`/products/${slug}`).then(setProduct).catch(() => setProduct(null)).finally(() => setLoading(false)); setQuantity(1); }, [slug]);
-  if (loading) return <Spinner/>;
-  if (!product) return <EmptyState title="We couldn't find that item" description="It may have been moved or taken off the shelf."/>;
-  const wished = wishlist.some(item => item.productId === product.id);
-  return <div className="container inner-page"><div className="crumb"><Link to="/shop">Shop</Link><ChevronRight size={15}/><Link to={`/shop?category=${product.category.slug}`}>{product.category.name}</Link><ChevronRight size={15}/><span>{product.title}</span></div>
-    <div className="product-detail"><div className="detail-image"><img src={product.imageUrl || '/demo/placeholder.svg'} alt={product.title}/>{product.featured && <span className="product-tag">COMMUNITY FAVOURITE</span>}</div><div className="detail-info"><span className="eyebrow">{product.category.name.toUpperCase()}</span><h1>{product.title}</h1><Price product={product}/><p className="detail-description">{product.description}</p><div className="stock-line"><span className={`stock-dot ${product.stock ? '' : 'out'}`}/>{product.stock ? `${product.stock} available` : 'Out of stock'}</div>
-      <div className="detail-purchase"><Quantity value={quantity} max={Math.min(10, product.stock)} onChange={setQuantity}/><button disabled={busy || product.stock === 0} className="button button-dark flex-grow" onClick={async () => {setBusy(true); try { await addToCart(product, quantity); } catch(e) { notify(e.message); } finally { setBusy(false); }}}><ShoppingBag size={19}/> {busy ? 'Adding...' : 'Add to bag'} <ArrowRight size={18}/></button><button className={`wishlist-square ${wished ? 'active' : ''}`} aria-label="Wishlist" onClick={async () => { if (!user) return navigate('/login?next='+encodeURIComponent(`/products/${slug}`)); try { await toggleWishlist(product); } catch(e) { notify(e.message); } }}><Heart size={21} fill={wished ? 'currentColor' : 'none'}/></button></div>
+  const {slug}=useParams();
+  const [product,setProduct]=useState(null),[related,setRelated]=useState([]),[loading,setLoading]=useState(true);
+  const [quantity,setQuantity]=useState(1),[busy,setBusy]=useState(false);
+  const {addToCart,toggleWishlist,wishlist,user,notify}=useStore();
+  const navigate=useNavigate();
+  useEffect(()=>{
+    let alive=true;setLoading(true);setRelated([]);
+    api('/products/'+slug).then(p=>{if(!alive)return;setProduct(p);return api('/products?'+new URLSearchParams({category:p.category.slug,limit:'5'})).then(data=>{if(alive)setRelated(data.items.filter(item=>item.id!==p.id).slice(0,4));}).catch(()=>{});})
+      .catch(()=>{if(alive)setProduct(null);}).finally(()=>{if(alive)setLoading(false);});
+    setQuantity(1);return()=>{alive=false;};
+  },[slug]);
+  if(loading)return <Spinner/>;
+  if(!product)return <EmptyState title="We couldn't find that item" description="It may have been moved or taken off the shelf."/>;
+  const wished=wishlist.some(item=>item.productId===product.id);
+  const specs=Array.isArray(product.specifications)?product.specifications.filter(row=>row?.label&&row?.value):[];
+  return <div className="container inner-page"><div className="crumb"><Link to="/shop">Shop</Link><ChevronRight size={15}/><Link to={'/shop?category='+product.category.slug}>{product.category.name}</Link><ChevronRight size={15}/><span>{product.title}</span></div>
+    <div className="product-detail"><ProductGallery product={product}/><div className="detail-info"><span className="eyebrow">{product.category.name.toUpperCase()}</span><h1>{product.title}</h1><Price product={product}/>{product.shortDescription&&<p className="detail-summary">{product.shortDescription}</p>}<p className="detail-description">{product.description}</p><div className="stock-line"><span className={'stock-dot '+(product.stock?'':'out')}/>{product.stock?product.stock<=5?'Only '+product.stock+' left in stock':'In stock and ready to order':'Currently out of stock'}</div>
+      <div className="detail-purchase"><Quantity value={quantity} max={Math.max(1,Math.min(10,product.stock))} onChange={setQuantity}/><button disabled={busy||product.stock===0} className="button button-dark flex-grow" onClick={async()=>{setBusy(true);try{await addToCart(product,quantity);}catch(e){notify(e.message);}finally{setBusy(false);}}}><ShoppingBag size={19}/>{busy?'Adding...':'Add to bag'} <ArrowRight size={18}/></button><button className={'wishlist-square '+(wished?'active':'')} aria-label={wished?'Remove from wishlist':'Add to wishlist'} onClick={async()=>{if(!user)return navigate('/login?next='+encodeURIComponent('/products/'+slug));try{await toggleWishlist(product);}catch(e){notify(e.message);}}}><Heart size={21} fill={wished?'currentColor':'none'}/></button></div>
       <div className="detail-benefits"><div><Truck size={20}/><span>Delivery to all 25 districts</span></div><div><PackageCheck size={20}/><span>Pay with cash on delivery</span></div><div><ShieldCheck size={20}/><span>Secure account checkout</span></div></div></div></div>
+    {(specs.length>0||product.sku)&&<section className="product-specifications"><div><span className="eyebrow">KNOW YOUR ITEM</span><h2>Product specifications.</h2><p>Helpful details about your new favourite.</p></div><dl>{product.sku&&<div><dt>Product code</dt><dd>{product.sku}</dd></div>}{specs.map((row,i)=><div key={row.label+'-'+i}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl></section>}
+    {related.length>0&&<section className="related-products"><div className="section-top"><div><span className="eyebrow">MORE TO EXPLORE</span><h2>You might also <em>like.</em></h2></div><Link className="section-link" to={'/shop?category='+product.category.slug}>View this category <ArrowRight size={17}/></Link></div><div className="product-grid">{related.map(item=><ProductCard product={item} key={item.id}/>)}</div></section>}
   </div>;
 }
 
@@ -109,7 +121,7 @@ export function Checkout() {
 export function OrderSuccess() {
   const { id } = useParams(); const [order, setOrder] = useState(null);
   useEffect(() => { api(`/orders/${id}`).then(setOrder).catch(() => {}); }, [id]);
-  return <div className="container inner-page success-page"><div className="success-symbol"><Check size={42}/></div><span className="eyebrow">THANK YOU FOR SHOPPING WITH US</span><h1>It's officially on its way <em>to being yours.</em></h1><p>Your order has been placed. We'll prepare everything for delivery. Payment is due on delivery.</p>{order && <div className="success-receipt"><div><span>Order number</span><strong>{order.number}</strong></div><div><span>Order total</span><strong>{lkr(order.totalCents)}</strong></div><div><span>Status</span><strong>{order.status}</strong></div></div>}<div className="success-actions"><Link to="/account?tab=orders" className="button button-dark">View my purchases <ArrowRight size={18}/></Link><Link to="/shop" className="button button-outline">Keep exploring</Link></div></div>;
+  return <div className="container inner-page success-page"><div className="success-symbol"><Check size={42}/></div><span className="eyebrow">THANK YOU FOR SHOPPING WITH US</span><h1>It's officially on its way <em>to being yours.</em></h1><p>Your order has been placed. We'll prepare everything for delivery. Payment is due on delivery.</p>{order && <div className="success-receipt"><div><span>Order number</span><strong>{order.number}</strong></div><div><span>Order total</span><strong>{lkr(order.totalCents)}</strong></div><div><span>Status</span><strong>{order.status}</strong></div></div>}<div className="success-actions"><Link to={"/orders/"+id} className="button button-dark">Track this order <ArrowRight size={18}/></Link><Link to="/shop" className="button button-outline">Keep exploring</Link></div></div>;
 }
 
 export function Auth({ mode }) {

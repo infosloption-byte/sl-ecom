@@ -105,6 +105,10 @@ model Product {
   slug           String        @unique @db.VarChar(191)
   description    String        @db.Text
   imageUrl       String?       @db.VarChar(500)
+  images         Json?
+  specifications Json?
+  shortDescription String?     @db.VarChar(320)
+  sku            String?       @unique @db.VarChar(80)
   priceCents     Int
   compareAtCents Int?
   stock          Int           @default(0)
@@ -154,12 +158,27 @@ model Order {
   shippingCents  Int
   totalCents     Int
   address        Json
+  courierName    String?       @db.VarChar(120)
+  trackingNumber String?       @db.VarChar(120)
+  trackingUrl    String?       @db.VarChar(500)
+  estimatedDeliveryAt DateTime?
+  statusEvents   OrderStatusEvent[]
   note           String?       @db.VarChar(500)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   items          OrderItem[]
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+model OrderStatusEvent {
+  id          String      @id @default(cuid()) @db.VarChar(64)
+  orderId     String      @db.VarChar(64)
+  status      OrderStatus
+  createdAt   DateTime    @default(now())
+  createdBy   String?     @db.VarChar(120)
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([orderId, createdAt])
 }
 
 model OrderItem {

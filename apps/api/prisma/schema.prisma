@@ -216,6 +216,7 @@ model ProductEvent {
   product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   @@index([productId, createdAt])
+  @@index([createdAt])
   @@index([type, createdAt])
   @@index([userId, productId, createdAt])
   @@index([visitorId, createdAt])

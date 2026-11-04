@@ -7,8 +7,8 @@ import { Spinner } from './components';
 const periods=[7,30,90];
 const number=n=>Number(n||0).toLocaleString('en-LK');
 function csvDownload(products,days){
-  const fields=['Product','Views','Clicks','Wishlist adds','Cart adds','Checkout starts','Units ordered','In carts','Saved now','Ordered value (cents)'];
-  const rows=products.map(p=>[p.title,p.views,p.clicks,p.wishlistAdds,p.cartAdds,p.checkoutStarts,p.unitsOrdered,p.inCarts,p.wishlistedNow,p.orderValueCents]);
+  const fields=['Product','Views','Clicks','Wishlist adds','Cart adds','Checkout starts','Units ordered','No purchase','In carts','Saved now','Ordered value (cents)'];
+  const rows=products.map(p=>[p.title,p.views,p.clicks,p.wishlistAdds,p.cartAdds,p.checkoutStarts,p.unitsOrdered,p.interestedNotPurchased,p.inCarts,p.wishlistedNow,p.orderValueCents]);
   const csv=[fields,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
   const a=document.createElement('a');a.href=url;a.download='slmarket-product-analytics-'+days+'d.csv';a.click();
@@ -18,7 +18,7 @@ const metricCards=m=>[
   ['Product views',m.VIEW,Eye],['Product clicks',m.CLICK,MousePointerClick],
   ['Wishlist adds',m.WISHLIST_ADD,Heart],['Cart adds',m.CART_ADD,ShoppingBag],
   ['Checkout starts',m.CHECKOUT_START,Activity],['Placed orders',m.orders,Package],
-  ['Approx. visitors',m.estimatedVisitors,Users],['COD received',lkr(m.receivedCents),ShoppingBag]
+  ['Interest without purchase',m.interestWithoutPurchasePairs,Users],['COD received',lkr(m.receivedCents),ShoppingBag]
 ];
 function ActivityChart({daily}){
   const selected=daily.length>40?daily.filter((_,i)=>i%7===0):daily;
@@ -82,9 +82,9 @@ export function AdminAnalytics(){
           <p className="insight-note">{number(m.identifiedCustomers)} signed-in customers · {number(m.estimatedVisitors)} approximate visitors.</p>
         </section>
       </div>
-      <section className="insight-panel"><div className="insight-heading"><div><span className="eyebrow">PRODUCT INTEREST</span><h2>What people consider.</h2><p>Products with high views and few purchases are worth reviewing. Choose an item for customer-level details.</p></div><input aria-label="Search analytics products" placeholder="Find product..." value={filter} onChange={e=>setFilter(e.target.value)}/></div>
-        <div className="admin-table-wrap"><table className="admin-table insight-table"><thead><tr><th>Product</th><th>Views</th><th>Clicks</th><th>Saved now</th><th>In carts</th><th>Cart adds</th><th>Units ordered</th><th></th></tr></thead>
-          <tbody>{products.map(p=><tr key={p.id}><td><div className="insight-product"><img src={p.imageUrl||'/demo/placeholder.svg'} alt=""/><span><b>{p.title}</b><small>{p.status}</small></span></div></td><td>{number(p.views)}</td><td>{number(p.clicks)}</td><td>{number(p.wishlistedNow)}</td><td>{number(p.inCarts)}</td><td>{number(p.cartAdds)}</td><td>{number(p.unitsOrdered)}</td><td><button className="insight-detail" onClick={()=>setSelected(p.id)}>Customers <ArrowRight size={16}/></button></td></tr>)}</tbody>
+      <section className="insight-panel"><div className="insight-heading"><div><span className="eyebrow">PRODUCT INTEREST</span><h2>What people consider.</h2><p>Interested but not purchased counts distinct signed-in customer/item pairs; products with many such shoppers are worth reviewing. Choose an item for customer-level details.</p></div><input aria-label="Search analytics products" placeholder="Find product..." value={filter} onChange={e=>setFilter(e.target.value)}/></div>
+        <div className="admin-table-wrap"><table className="admin-table insight-table"><thead><tr><th>Product</th><th>Views</th><th>Clicks</th><th>Saved now</th><th>In carts</th><th>Cart adds</th><th>Interested, no purchase</th><th>Units ordered</th><th></th></tr></thead>
+          <tbody>{products.map(p=><tr key={p.id}><td><div className="insight-product"><img src={p.imageUrl||'/demo/placeholder.svg'} alt=""/><span><b>{p.title}</b><small>{p.status}</small></span></div></td><td>{number(p.views)}</td><td>{number(p.clicks)}</td><td>{number(p.wishlistedNow)}</td><td>{number(p.inCarts)}</td><td>{number(p.cartAdds)}</td><td><strong className="insight-highlight">{number(p.interestedNotPurchased)}</strong></td><td>{number(p.unitsOrdered)}</td><td><button className="insight-detail" onClick={()=>setSelected(p.id)}>Customers <ArrowRight size={16}/></button></td></tr>)}</tbody>
         </table></div>{!products.length&&<div className="insight-empty">No products found.</div>}
       </section>
       {selected&&<AudienceReport result={audience} loading={audienceLoading} close={()=>setSelected(null)}/>}

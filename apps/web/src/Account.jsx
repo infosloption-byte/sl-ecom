@@ -6,6 +6,7 @@ import { api, dateText, emptyAddress, lkr } from './api';
 import { useStore } from './context';
 import { AddressFields } from './Storefront';
 import { EmptyState, Field, PageHeading, ProductCard, Spinner } from './components';
+import { AnalyticsPreference } from './AnalyticsPreference';
 
 const tabs = [ { id:'overview', label:'Overview', icon: Home }, { id:'orders', label:'My purchases', icon: Package }, { id:'wishlist', label:'Wishlist', icon: Heart }, { id:'addresses', label:'Addresses', icon: MapPin }, { id:'settings', label:'Settings', icon: Settings } ];
 export function Account() {
@@ -41,6 +42,7 @@ function AccountSettings({ user, setUser, notify }) {
   const linkGoogle = async credential => {try {const {user:updated}=await api('/me/link-google',{method:'POST',body:{credential}});setUser(updated);notify('Google account linked.');}catch(e){notify(e.message);}};
   return <div className="account-section"><div className="section-heading-small"><h2>Account settings</h2><p>Little details that make everything easier.</p></div><div className="settings-stack"><form className="form-card" onSubmit={saveProfile}><h3>Personal details</h3><div className="form-grid"><Field label="Full name" required value={name} onChange={e=>setName(e.target.value)}/><Field label="Phone" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="07XXXXXXXX"/><Field label="Email address" value={user.email} disabled/></div><button className="button button-dark" disabled={busy}>Save changes <ArrowRight size={17}/></button></form>
     <form className="form-card" onSubmit={changePassword}><h3>{user.hasPassword ? 'Change password' : 'Create a password'}</h3><p className="muted-note">Use a unique password with at least 10 characters.</p><div className="form-grid">{user.hasPassword && <Field label="Current password" type="password" required value={oldPassword} onChange={e=>setOldPassword(e.target.value)}/>}<Field label="New password" type="password" required minLength={10} value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></div><button className="button button-outline" disabled={busy}>Update password</button></form>
+    <div className="form-card"><h3>Shopping activity privacy</h3><AnalyticsPreference/></div>
     <div className="form-card"><h3>Google account</h3><p className="muted-note">{user.hasGoogle ? 'Your Google account is connected for easier sign-in.' : 'Connect Google to sign in without a password.'}</p>{user.hasGoogle ? <span className="connected-label"><Check size={17}/> Google connected</span> : import.meta.env.VITE_GOOGLE_CLIENT_ID ? <div className="google-container"><GoogleLogin onSuccess={response => linkGoogle(response.credential)} onError={()=>notify('Google connection failed.')} width="260"/></div> : <p className="muted-note">Set the Google Client ID to enable this option.</p>}</div>
   </div></div>;
 }

@@ -19,6 +19,7 @@ import { asyncRoute as route, error, orderNumber, publicUser, shippingFor, slugi
 import { mailEnabled, sendResetEmail, sendOrderEmails, sendContactMail } from './mail.js';
 import { addressSchema, email, password, productSchema, settingsSchema, contactSchema } from './validators.js';
 import { validateStatusChange } from './orderTracking.js';
+import { recordEvent, analyticsSummary, analyticsAudience, startAnalyticsCleanup } from './analytics.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -76,6 +77,25 @@ app.post('/api/contact', contactLimit, route(async (req, res) => {
   if (!destination) throw error(503, 'Store contact email is not configured.');
   try { await sendContactMail(input, destination); }
   catch (err) { console.error('Contact delivery failed:', err.message); throw error(503, 'Message delivery is temporarily unavailable. Please email the store directly.'); }
+  res.status(202).json({ok:true});
+}));
+
+// First-party shop engagement. An authenticated actor is always derived from the session cookie.
+const analyticsLimiter = rateLimit({ windowMs:15*60*1000, limit:90, standardHeaders:'draft-7', legacyHeaders:false,
+  message:{error:'Too many activity events.'} });
+app.post('/api/analytics/event', analyticsLimiter, route(async (req,res)=>{
+  const input=z.object({
+    productId:z.string().min(5).max(64),
+    type:z.enum(['CLICK','VIEW','CART_ADD','CHECKOUT_START']),
+    visitorId:z.string().uuid()
+  }).strict().parse(req.body);
+  // Admin browsing does not count as customer engagement; authenticated cart adds are logged by the cart API.
+  if(req.cookies?.slm_analytics_disabled==='1')return res.status(202).json({ok:true});
+  if(req.user?.role==='ADMIN'||(req.user && input.type==='CART_ADD')||(!req.user&&input.type==='CHECKOUT_START'))
+    return res.status(202).json({ok:true});
+  const product=await prisma.product.findFirst({where:{id:input.productId,status:'ACTIVE'},select:{id:true}});
+  if(!product)return res.status(202).json({ok:true});
+  await recordEvent(prisma,{...input,userId:req.user?.id||null});
   res.status(202).json({ok:true});
 }));
 
@@ -211,6 +231,7 @@ app.post('/api/cart', requireAuth, route(async (req, res) => {
   const nextQuantity = (existing?.quantity || 0) + quantity;
   if (nextQuantity > Math.min(10, product.stock)) throw error(409, 'Not enough stock for the requested quantity.');
   await prisma.cartItem.upsert({ where: { userId_productId: { userId: req.user.id, productId } }, update: { quantity: nextQuantity }, create: { userId: req.user.id, productId, quantity: nextQuantity } });
+  if(req.cookies?.slm_analytics_disabled!=='1')await recordEvent(prisma,{type:'CART_ADD',productId,userId:req.user.id}).catch(err=>console.error('Cart analytics failed:',err.message));
   res.json({ ok: true });
 }));
 app.post('/api/cart/sync', requireAuth, route(async (req, res) => {
@@ -222,6 +243,7 @@ app.post('/api/cart/sync', requireAuth, route(async (req, res) => {
     const quantity = Math.min((existing?.quantity || 0) + item.quantity, product.stock, 10);
     if (quantity < 1) continue;
     await prisma.cartItem.upsert({ where: { userId_productId: { userId: req.user.id, productId: item.productId } }, update: { quantity }, create: { userId: req.user.id, productId: item.productId, quantity } });
+    if(req.cookies?.slm_analytics_disabled!=='1')await recordEvent(prisma,{type:'CART_ADD',productId:item.productId,userId:req.user.id}).catch(err=>console.error('Cart sync analytics failed:',err.message));
   }
   res.json({ ok: true });
 }));
@@ -247,6 +269,7 @@ app.post('/api/wishlist/:productId', requireAuth, route(async (req, res) => {
   const product = await prisma.product.findUnique({ where: { id: req.params.productId } });
   if (!product || product.status !== 'ACTIVE') throw error(404, 'Product unavailable.');
   await prisma.wishlistItem.upsert({ where: { userId_productId: { userId: req.user.id, productId: product.id } }, create: { userId: req.user.id, productId: product.id }, update: {} });
+  if(req.cookies?.slm_analytics_disabled!=='1')await recordEvent(prisma,{type:'WISHLIST_ADD',productId:product.id,userId:req.user.id}).catch(err=>console.error('Wishlist analytics failed:',err.message));
   res.json({ ok: true });
 }));
 app.delete('/api/wishlist/:productId', requireAuth, route(async (req, res) => {
@@ -312,6 +335,16 @@ admin.get('/overview', route(async (_req, res) => {
     prisma.order.aggregate({ where: { status: { not: 'CANCELLED' } }, _sum: { totalCents: true } })
   ]);
   res.json({ products, customers, orders, orderValueCents: total._sum.totalCents || 0, recent });
+}));
+admin.get('/analytics/summary',route(async(req,res)=>{
+  const {days}=z.object({days:z.coerce.number().int().refine(x=>[7,30,90].includes(x)).default(30)}).parse(req.query);
+  res.json(await analyticsSummary(prisma,days));
+}));
+admin.get('/analytics/audience/:productId',route(async(req,res)=>{
+  const {days}=z.object({days:z.coerce.number().int().refine(x=>[7,30,90].includes(x)).default(30)}).parse(req.query);
+  const result=await analyticsAudience(prisma,req.params.productId,days);
+  if(!result)throw error(404,'Product not found.');
+  res.json(result);
 }));
 admin.get('/products', route(async (_req, res) => res.json(await prisma.product.findMany({ include: { category: true }, orderBy: { createdAt: 'desc' }, take: 500 }))));
 admin.get('/products/:id', route(async (req, res) => {
@@ -425,5 +458,6 @@ app.use((err, _req, res, _next) => {
   res.status(status).json({ error: status === 500 ? 'Something went wrong on the server.' : err.message });
 });
 
+startAnalyticsCleanup(prisma);
 const port = Number(process.env.PORT || 4010);
 app.listen(port, () => console.log(`SL Options Market API listening on http://localhost:${port}`));

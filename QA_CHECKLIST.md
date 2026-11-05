@@ -98,3 +98,18 @@ Run these tests on a local or staging MySQL database after `npm install`, `npm r
 - [ ] Enable **Reduce motion** in the OS/browser: orbit, pulse and progress animations stop and the overlay disappears without motion.
 - [ ] Test with the API briefly unavailable: the screen does not trap customers indefinitely; regular API error/empty states become visible.
 - [ ] Confirm no requests are triggered by the loader itself and no customer/order data appears within loading markup.
+
+## Customer and product analytics (2026-11-05)
+
+- [ ] Backup `slstore`, run additive `20261105000000_product_engagement_analytics` migration; existing orders and accounts remain intact.
+- [ ] After `npm ci`, `npm run dev` auto-generates the Prisma Client, and API health responds at localhost:4010.
+- [ ] Anonymous customer clicks product card, views product and adds to cart; Admin → Analytics shows aggregate events without identifying the visitor.
+- [ ] Signed-in customer clicks, views, wishlists and adds to cart; customer-product detail shows account activity and current wishlist/cart status.
+- [ ] Confirm deduplication on repeated product-detail refreshes; viewing an item does not count as a purchase.
+- [ ] Place a COD order; purchased units and ordered value increase. Received COD value increases only when marked PAID.
+- [ ] Cancel the order; cancelled-order totals do not appear as successful sales. Existing order cancellation and stock restore still work.
+- [ ] Test 7/30/90-day reporting, daily activity chart, sorting/searching item table, aggregate CSV download and 320px/768px/desktop admin layouts.
+- [ ] Log in as a customer; requests to `/api/admin/analytics/summary` and `/api/admin/analytics/audience/:productId` return 403.
+- [ ] Test the optional analytics opt-out from Privacy and Account settings; no new VIEW, CLICK, WISHLIST_ADD or CART_ADD events are recorded after opting out.
+- [ ] Check event retention after 90 days and that historical shopping data prior to rollout is not fabricated.
+- [ ] Verify `npm test`, `npm run build`, `npm audit` and existing storefront account/cart/checkout flows.

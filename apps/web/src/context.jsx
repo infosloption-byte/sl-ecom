@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from './api';
+import { trackProduct } from './analyticsTracking';
 
 const StoreContext = createContext(null);
 const guestKey = 'slm_guest_cart';
@@ -46,6 +47,7 @@ export function StoreProvider({ children }) {
       const next = Math.min(10, product.stock, (existing?.quantity || 0) + quantity);
       return existing ? prev.map(item => item.product.id === product.id ? { ...item, quantity: next } : item) : [...prev, { product, quantity: next }];
     });
+    if(!user) trackProduct(product.id,'CART_ADD');
     notify(`${product.title} added to your bag.`);
   };
   const updateCartQuantity = async (productId, quantity) => {

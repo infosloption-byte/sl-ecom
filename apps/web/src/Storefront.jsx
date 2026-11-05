@@ -6,6 +6,7 @@ import { api, dateText, districts, emptyAddress, lkr } from './api';
 import { useStore } from './context';
 import { Dropdown, EmptyState, Field, PageHeading, Price, ProductCard, Quantity, Spinner, TextAreaField } from './components';
 import { ProductGallery } from './ProductGallery';
+import { trackProduct } from './analyticsTracking';
 
 const shippingEstimate = (subtotal, settings) => settings ? (subtotal >= settings.freeShippingFromCents ? 0 : settings.shippingFlatCents) : 0;
 
@@ -63,7 +64,7 @@ export function ProductDetail() {
   const navigate=useNavigate();
   useEffect(()=>{
     let alive=true;setLoading(true);setRelated([]);
-    api('/products/'+slug).then(p=>{if(!alive)return;setProduct(p);return api('/products?'+new URLSearchParams({category:p.category.slug,limit:'5'})).then(data=>{if(alive)setRelated(data.items.filter(item=>item.id!==p.id).slice(0,4));}).catch(()=>{});})
+    api('/products/'+slug).then(p=>{if(!alive)return;setProduct(p);trackProduct(p.id,'VIEW');return api('/products?'+new URLSearchParams({category:p.category.slug,limit:'5'})).then(data=>{if(alive)setRelated(data.items.filter(item=>item.id!==p.id).slice(0,4));}).catch(()=>{});})
       .catch(()=>{if(alive)setProduct(null);}).finally(()=>{if(alive)setLoading(false);});
     setQuantity(1);return()=>{alive=false;};
   },[slug]);
@@ -104,6 +105,10 @@ export function Checkout() {
   const [addresses, setAddresses] = useState([]); const [address, setAddress] = useState({ ...emptyAddress, fullName: user?.name || '', phone: user?.phone || '' });
   const [chosenId, setChosenId] = useState('new'); const [saveAddress, setSaveAddress] = useState(false); const [acceptTerms, setAcceptTerms] = useState(false); const [note, setNote] = useState(''); const [busy, setBusy] = useState(false);
   const key = useRef(crypto.randomUUID());
+  useEffect(() => {
+    for(const {product} of cartItems) trackProduct(product.id,'CHECKOUT_START');
+  // Track only the checkout-entry snapshot; server dedupes repeated visits.
+  }, []);
   useEffect(() => { api('/me/addresses').then(list => { setAddresses(list); const selected = list.find(a => a.isDefault) || list[0]; if (selected) { setChosenId(selected.id); setAddress(({...selected, fullName: selected.fullName, phone: selected.phone })); } }).catch(() => {}); }, []);
   const total = subtotal + shippingEstimate(subtotal, settings);
   const submit = async e => {

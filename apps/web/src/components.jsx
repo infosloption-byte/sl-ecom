@@ -4,6 +4,7 @@ import { ArrowRight, ChevronDown, Check, Heart, Minus, Plus, ShoppingBag } from 
 import { Link, useNavigate } from 'react-router-dom';
 import { lkr } from './api';
 import { useStore } from './context';
+import { trackProduct } from './analyticsTracking';
 
 export function Dropdown({ value, options, onChange, placeholder = 'Select...', label, disabled = false }) {
   const [open, setOpen] = useState(false);
@@ -61,12 +62,12 @@ export function ProductCard({ product }) {
   const wished = wishlist.some(item => item.productId === product.id);
   const run = async fn => { setBusy(true); try { await fn(); } catch(e) { notify(e.message); } finally { setBusy(false); } };
   return <article className="product-card">
-    <div className="product-visual"><Link to={`/products/${product.slug}`} aria-label={`View ${product.title}`}><img src={product.imageUrl || '/demo/placeholder.svg'} alt={product.title} loading="lazy"/></Link>
+    <div className="product-visual"><Link to={`/products/${product.slug}`} onClick={()=>trackProduct(product.id,'CLICK')} aria-label={`View ${product.title}`}><img src={product.imageUrl || '/demo/placeholder.svg'} alt={product.title} loading="lazy"/></Link>
       {product.featured && <span className="product-tag">FEATURED</span>}
       <button className={`heart-btn ${wished ? 'active' : ''}`} aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'} disabled={busy} onClick={() => user ? run(() => toggleWishlist(product)) : navigate('/login?next=/shop')}><Heart size={19} fill={wished ? 'currentColor' : 'none'}/></button>
       <button className="quick-add" disabled={busy || !product.stock} onClick={() => run(() => addToCart(product))}><ShoppingBag size={16}/>{product.stock ? 'Add to bag' : 'Sold out'}</button>
     </div>
-    <div className="product-meta"><span>{product.category?.name || 'Everyday essentials'}</span><Link to={`/products/${product.slug}`}><h3>{product.title}</h3></Link><Price product={product}/></div>
+    <div className="product-meta"><span>{product.category?.name || 'Everyday essentials'}</span><Link to={`/products/${product.slug}`} onClick={()=>trackProduct(product.id,'CLICK')}><h3>{product.title}</h3></Link><Price product={product}/></div>
   </article>;
 }
 export function EmptyState({ icon: Icon = ShoppingBag, title, description, link = '/shop', action = 'Explore the shop' }) { return <div className="empty-state"><div className="empty-icon"><Icon size={31}/></div><h2>{title}</h2><p>{description}</p><Link to={link} className="button button-dark">{action}<ArrowRight size={17}/></Link></div>; }

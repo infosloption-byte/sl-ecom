@@ -1,0 +1,21 @@
+/* Admin communications diagnostic panel */
+.admin-email-panel{margin-top:22px;display:grid;gap:20px}
+.admin-email-heading{display:flex;align-items:start;justify-content:space-between;gap:18px}
+.admin-email-heading h2{font-size:1.35rem;margin:10px 0 8px}
+.admin-email-heading p{font-size:.83rem;color:#788b7a;line-height:1.6;margin:0}
+.admin-email-heading>svg{color:#73996a;flex:none}
+.admin-email-integration-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.admin-email-service{padding:19px;border-radius:12px;border:1px solid #dce8d7;background:#f7faf5;min-width:0}
+.admin-email-service>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.admin-email-service strong{font-size:.9rem;color:#2e4731}
+.admin-email-service p{font-size:.78rem;color:#718472;line-height:1.7;overflow-wrap:anywhere}
+.admin-email-good,.admin-email-warning{display:inline-flex;align-items:center;gap:5px;border-radius:8px;font-size:.7rem;font-weight:800;padding:7px 9px}
+.admin-email-good{color:#427344;background:#e3f1df}
+.admin-email-warning{color:#9b733a;background:#fff0d9}
+.admin-email-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.admin-email-actions .button{min-height:41px}
+.admin-email-panel .muted-note{margin:0;line-height:1.7}
+.admin-email-success,.admin-email-error{border-radius:9px;padding:13px;font-size:.82rem;line-height:1.6}
+.admin-email-success{background:#e6f2e1;color:#376b3e}
+.admin-email-error{background:#ffece8;color:#914d41}
+@media(max-width:700px){.admin-email-integration-grid{grid-template-columns:1fr}.admin-email-actions{display:grid}.admin-email-actions button{width:100%}.admin-email-heading h2{font-size:1.2rem}}

@@ -16,7 +16,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from './db.js';
 import { optionalAuth, requireAuth, requireAdmin, startSession, signOut, verifyGoogleCredential } from './auth.js';
 import { asyncRoute as route, error, orderNumber, publicUser, shippingFor, slugify, token, sha256 } from './utils.js';
-import { mailEnabled, sendResetEmail, sendOrderEmails, sendContactMail } from './mail.js';
+import { mailEnabled, smtpMissingSettings, verifySmtpConnection, sendSmtpTest, sendResetEmail, sendOrderEmails, sendContactMail, sendWelcomeEmail, sendOrderUpdateEmail, sendTrackingUpdateEmail, sendSecurityEmail } from './mail.js';
+import { orderChange, trackingChanged } from './mailTemplates.js';
 import { addressSchema, email, password, productSchema, settingsSchema, contactSchema } from './validators.js';
 import { validateStatusChange } from './orderTracking.js';
 import { recordEvent, analyticsSummary, analyticsAudience, startAnalyticsCleanup } from './analytics.js';
@@ -121,7 +122,9 @@ app.post('/api/auth/register', loginLimit, route(async (req, res) => {
   const exists = await prisma.user.findUnique({ where: { email: input.email } });
   if (exists) throw error(409, 'An account with this email already exists.');
   const user = await prisma.user.create({ data: { name: input.name, email: input.email, passwordHash: await bcrypt.hash(input.password, 12) } });
-  res.status(201).json({ user: await startSession(res, user) });
+  const publicProfile = await startSession(res, user);
+  res.status(201).json({ user: publicProfile });
+  void sendWelcomeEmail(user);
 }));
 app.post('/api/auth/login', loginLimit, route(async (req, res) => {
   const input = z.object({ email, password: z.string().min(1) }).strict().parse(req.body);
@@ -133,12 +136,16 @@ app.post('/api/auth/google', loginLimit, route(async (req, res) => {
   const { credential } = z.object({ credential: z.string().min(50).max(10000) }).strict().parse(req.body);
   const profile = await verifyGoogleCredential(credential);
   let user = await prisma.user.findUnique({ where: { googleSub: profile.sub } });
+  let createdNow = false;
   if (!user) {
     const existing = await prisma.user.findUnique({ where: { email: profile.email } });
     if (existing) throw error(409, 'This email already has an account. Sign in first, then link Google under Account settings.');
     user = await prisma.user.create({ data: { name: profile.name, email: profile.email, googleSub: profile.sub } });
+    createdNow = true;
   }
-  res.json({ user: await startSession(res, user) });
+  const publicProfile = await startSession(res, user);
+  res.json({ user: publicProfile });
+  if(createdNow) void sendWelcomeEmail(user,{google:true});
 }));
 app.post('/api/auth/forgot-password', loginLimit, route(async (req, res) => {
   const input = z.object({ email }).strict().parse(req.body);
@@ -148,7 +155,11 @@ app.post('/api/auth/forgot-password', loginLimit, route(async (req, res) => {
     const secret = token();
     await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
     await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha256(secret), expiresAt: new Date(Date.now() + 30 * 60 * 1000) } });
-    await sendResetEmail(user.email, secret).catch(err => console.error('Password recovery email failed:', err.message));
+    try { await sendResetEmail(user.email, secret); }
+    catch (err) {
+      await prisma.passwordResetToken.deleteMany({ where: { tokenHash: sha256(secret) } });
+      console.error('Password recovery email failed:', String(err.code || err.name || 'delivery_error'));
+    }
   }
   res.json({ message: 'If an email/password account exists, we have sent a reset link.' });
 }));
@@ -165,6 +176,9 @@ app.post('/api/auth/reset-password', loginLimit, route(async (req, res) => {
     await tx.passwordResetToken.deleteMany({ where: { userId: reset.userId, id: { not: reset.id } } });
   });
   res.json({ ok: true });
+  void prisma.user.findUnique({where:{id:reset.userId},select:{name:true,email:true}})
+    .then(user=>user && sendSecurityEmail(user,'PASSWORD_CHANGED'))
+    .catch(err=>console.error('Password notification failed:',String(err.code||err.name||'delivery_error')));
 }));
 app.post('/api/auth/logout', route(signOut));
 app.get('/api/me', requireAuth, (req, res) => res.json({ user: publicUser(req.user) }));
@@ -179,6 +193,7 @@ app.put('/api/me/password', requireAuth, route(async (req, res) => {
   await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12) } });
   await prisma.session.deleteMany({ where: { userId: req.user.id, id: { not: req.sessionId } } });
   res.json({ ok: true });
+  void sendSecurityEmail(req.user,'PASSWORD_CHANGED');
 }));
 app.post('/api/me/link-google', requireAuth, route(async (req, res) => {
   const { credential } = z.object({ credential: z.string().min(50).max(10000) }).parse(req.body);
@@ -188,6 +203,7 @@ app.post('/api/me/link-google', requireAuth, route(async (req, res) => {
   if (owned && owned.id !== req.user.id) throw error(409, 'This Google account is already linked elsewhere.');
   const user = await prisma.user.update({ where: { id: req.user.id }, data: { googleSub: google.sub } });
   res.json({ user: publicUser(user) });
+  void sendSecurityEmail(user,'GOOGLE_LINKED');
 }));
 
 app.get('/api/me/addresses', requireAuth, route(async (req, res) => {

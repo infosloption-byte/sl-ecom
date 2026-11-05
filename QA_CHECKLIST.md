@@ -99,6 +99,21 @@ Run these tests on a local or staging MySQL database after `npm install`, `npm r
 - [ ] Test with the API briefly unavailable: the screen does not trap customers indefinitely; regular API error/empty states become visible.
 - [ ] Confirm no requests are triggered by the loader itself and no customer/order data appears within loading markup.
 
+## Email and authentication hardening
+
+- [ ] Admin Store settings → Connected services displays backend SMTP/Google setup status without credentials.
+- [ ] Admin SMTP verify authenticates; test email is only sent to signed-in administrator address.
+- [ ] New email/password and Google registrations send the correct welcome emails without sending duplicates on every login.
+- [ ] Existing password account cannot be silently linked via Google email; explicit linking from signed-in settings works.
+- [ ] Reset-link email is single-use and expires; failed SMTP delivery removes an unused reset token without exposing account existence.
+- [ ] Password change, password reset and Google linking send account security notices without passwords or access tokens.
+- [ ] Customer order confirmation includes exact items, LKR total and pending COD wording; separate staff alert reaches configured store inbox.
+- [ ] Admin order status and payment changes trigger customer notifications only when values change.
+- [ ] Courier/tracking edits send updated delivery details, and no notification is sent when values stay unchanged.
+- [ ] SMTP outages do not roll back registration or orders; provider rejection is logged without leaking secrets.
+- [ ] Production sender/domain and STORE_URL are configured correctly and no email links point to localhost.
+- [ ] All existing account, cart, wishlist, checkout, invoice and admin analytics flows remain functional.
+
 ## Customer and product analytics (2026-11-05)
 
 - [ ] Backup `slstore`, run additive `20261105000000_product_engagement_analytics` migration; existing orders and accounts remain intact.

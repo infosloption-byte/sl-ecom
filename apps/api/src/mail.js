@@ -36,30 +36,34 @@ function logFailure(label,error){
   // SMTP replies can contain customer addresses and server details: never log message body or reset links.
   console.error('Transactional email failed ('+label+'): '+String(error.code||error.name||'delivery_error'));
 }
-export async function deliverBestEffort(label,message){
-  if(!mailEnabled()||!message)return {skipped:true};
-  try{return await deliver(message);}
+export async function deliverBestEffort(label,prepare){
+  if(!mailEnabled())return {skipped:true};
+  try{
+    const message=typeof prepare==='function'?prepare():prepare;
+    if(!message)return {skipped:true};
+    return await deliver(message);
+  }
   catch(error){logFailure(label,error);return {failed:true};}
 }
 export async function sendWelcomeEmail(user,{google=false}={}){
-  return deliverBestEffort('welcome',welcomeMessage(user,{google}));
+  return deliverBestEffort('welcome',()=>welcomeMessage(user,{google}));
 }
 export async function sendOrderEmails(order,user){
   if(!mailEnabled())return {skipped:true};
-  const outgoing=[['customer-order',placedMessage(order,user)]];
-  if(process.env.ORDER_ALERT_EMAIL) outgoing.push(['staff-order',{
+  const outgoing=[['customer-order',()=>placedMessage(order,user)]];
+  if(process.env.ORDER_ALERT_EMAIL) outgoing.push(['staff-order',()=>({
     ...staffOrderMessage(order,user),to:process.env.ORDER_ALERT_EMAIL
-  }]);
+  })]);
   return Promise.all(outgoing.map(([label,message])=>deliverBestEffort(label,message)));
 }
 export async function sendOrderUpdateEmail(order,user,before){
-  return deliverBestEffort('order-update',orderUpdateMessage(order,user,before));
+  return deliverBestEffort('order-update',()=>orderUpdateMessage(order,user,before));
 }
 export async function sendTrackingUpdateEmail(order,user){
-  return deliverBestEffort('delivery-tracking',trackingMessage(order,user));
+  return deliverBestEffort('delivery-tracking',()=>trackingMessage(order,user));
 }
 export async function sendSecurityEmail(user,event){
-  return deliverBestEffort('account-security',securityMessage(user,event));
+  return deliverBestEffort('account-security',()=>securityMessage(user,event));
 }
 export async function sendResetEmail(email,token){
   if(!mailEnabled())throw new Error('Password recovery SMTP is not configured.');

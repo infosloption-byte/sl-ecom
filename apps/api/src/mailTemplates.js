@@ -5,6 +5,7 @@ export const htmlEscape = value => String(value ?? '').replace(/[&<>"']/g, c => 
 })[c]);
 
 export function storeLink(route, storeUrl=process.env.STORE_URL || 'http://localhost:5180') {
+  if(process.env.NODE_ENV==='production'&&!process.env.STORE_URL && storeUrl==='http://localhost:5180')throw new Error('Set STORE_URL for customer email links in production.');
   const base=new URL(storeUrl);
   if(!['https:','http:'].includes(base.protocol)) throw new Error('STORE_URL must use HTTP(S).');
   return new URL(route,base.origin).toString();

@@ -157,7 +157,8 @@ app.post('/api/auth/forgot-password', loginLimit, route(async (req, res) => {
     await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha256(secret), expiresAt: new Date(Date.now() + 30 * 60 * 1000) } });
     try { await sendResetEmail(user.email, secret); }
     catch (err) {
-      await prisma.passwordResetToken.deleteMany({ where: { tokenHash: sha256(secret) } });
+      await prisma.passwordResetToken.deleteMany({ where: { tokenHash: sha256(secret) } })
+        .catch(cleanupErr => console.error('Password recovery token cleanup failed:', String(cleanupErr.code || 'database_error')));
       console.error('Password recovery email failed:', String(err.code || err.name || 'delivery_error'));
     }
   }

@@ -344,6 +344,27 @@ app.post('/api/checkout', requireAuth, route(async (req, res) => {
 // All administration endpoints are protected in one place.
 const admin = express.Router();
 admin.use(requireAdmin);
+// Admin-only integration diagnostics; never return SMTP passwords or Google secrets.
+admin.get('/integrations',route(async (_req,res)=>{
+  res.json({
+    smtp:{configured:mailEnabled(),missing:smtpMissingSettings()},
+    google:{configured:Boolean(process.env.GOOGLE_CLIENT_ID)}
+  });
+}));
+admin.post('/integrations/verify-smtp',loginLimit,route(async (_req,res)=>{
+  const result=await verifySmtpConnection();
+  res.json(result);
+}));
+admin.post('/integrations/test-email',loginLimit,route(async (req,res)=>{
+  if(!mailEnabled())throw error(503,'Configure SMTP settings before sending a test.');
+  try { await sendSmtpTest(req.user); }
+  catch(err){
+    console.error('SMTP test delivery failed:',String(err.code||err.name||'delivery_error'));
+    throw error(503,'The mail server could not accept a test email. Check SMTP settings and your inbox.');
+  }
+  res.json({ok:true,message:'SMTP accepted the test email for your administrator address.'});
+}));
+
 admin.get('/overview', route(async (_req, res) => {
   const [products, customers, orders, recent, total] = await Promise.all([
     prisma.product.count(), prisma.user.count({ where: { role: 'CUSTOMER' } }), prisma.order.count(),
@@ -411,16 +432,23 @@ admin.get('/orders/:id', route(async (req, res) => {
 }));
 admin.patch('/orders/:id', route(async (req, res) => {
   const { status, paymentStatus } = z.object({ status: z.enum(['PLACED','CONFIRMED','PACKED','SHIPPED','DELIVERED','CANCELLED']), paymentStatus: z.enum(['PENDING','PAID','FAILED','REFUNDED']) }).strict().parse(req.body);
-  const updated = await prisma.$transaction(async tx => {
+  const {updated,before} = await prisma.$transaction(async tx => {
     const current = await tx.order.findUnique({ where: { id: req.params.id }, include: { items: true } });
     if (!current) throw error(404, 'Order not found.');
     if (!validateStatusChange(current.status, status)) throw error(409, 'Order status cannot go backwards; shipped and delivered orders cannot be cancelled here.');
     if (status === 'CANCELLED' && current.status !== 'CANCELLED') {
       for (const item of current.items) await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
     }
-    return tx.order.update({ where: { id: current.id }, data: { status, paymentStatus, ...(status !== current.status ? { statusEvents: { create: { status, createdBy: req.user.name.slice(0, 120) } } } : {}) } });
+    const changed = await tx.order.update({ where: { id: current.id }, data: { status, paymentStatus, ...(status !== current.status ? { statusEvents: { create: { status, createdBy: req.user.name.slice(0, 120) } } } : {}) } });
+    return {updated:changed,before:{status:current.status,paymentStatus:current.paymentStatus}};
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   res.json(updated);
+  const change = orderChange(before,updated);
+  if(change.statusChanged||change.paymentChanged){
+    void prisma.user.findUnique({where:{id:updated.userId},select:{name:true,email:true}})
+      .then(user=>user && sendOrderUpdateEmail(updated,user,before))
+      .catch(err=>console.error('Order email lookup failed:',String(err.code||err.name||'delivery_error')));
+  }
 }));
 admin.patch('/orders/:id/tracking', route(async (req, res) => {
   const input = z.object({
@@ -431,10 +459,16 @@ admin.patch('/orders/:id/tracking', route(async (req, res) => {
   }).strict().parse(req.body);
   const order = await prisma.order.findUnique({ where: { id: req.params.id } });
   if (!order) throw error(404, 'Order not found.');
-  res.json(await prisma.order.update({ where: { id: order.id }, data: {
+  const updated = await prisma.order.update({ where: { id: order.id }, data: {
     ...Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'estimatedDeliveryAt').map(([k, v]) => [k, v || null])),
     ...(Object.prototype.hasOwnProperty.call(input, 'estimatedDeliveryAt') ? { estimatedDeliveryAt: input.estimatedDeliveryAt ? new Date(input.estimatedDeliveryAt) : null } : {})
-  } }));
+  } });
+  res.json(updated);
+  if(trackingChanged(order,updated)){
+    void prisma.user.findUnique({where:{id:updated.userId},select:{name:true,email:true}})
+      .then(user=>user && sendTrackingUpdateEmail(updated,user))
+      .catch(err=>console.error('Tracking email lookup failed:',String(err.code||err.name||'delivery_error')));
+  }
 }));
 admin.get('/customers', route(async (_req, res) => res.json(await prisma.user.findMany({ where: { role: 'CUSTOMER' }, select: { id: true, name: true, email: true, phone: true, createdAt: true, _count: { select: { orders: true } } }, orderBy: { createdAt: 'desc' }, take: 500 }))));
 admin.put('/settings', route(async (req, res) => {

@@ -196,7 +196,7 @@ app.put('/api/me/password', requireAuth, route(async (req, res) => {
   void sendSecurityEmail(req.user,'PASSWORD_CHANGED');
 }));
 app.post('/api/me/link-google', requireAuth, route(async (req, res) => {
-  const { credential } = z.object({ credential: z.string().min(50).max(10000) }).parse(req.body);
+  const { credential } = z.object({ credential: z.string().min(50).max(10000) }).strict().parse(req.body);
   const google = await verifyGoogleCredential(credential);
   if (google.email !== req.user.email) throw error(409, 'Google email must match the signed-in account.');
   const owned = await prisma.user.findUnique({ where: { googleSub: google.sub } });
@@ -336,9 +336,10 @@ app.post('/api/checkout', requireAuth, route(async (req, res) => {
     await tx.cartItem.deleteMany({ where: { userId: req.user.id } });
     return created;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 });
-  // Email failures never invalidate an order that was already committed.
-  await sendOrderEmails(order, req.user).catch(err => console.error('Order notification failed:', err.message));
+  // Return the confirmed order immediately; SMTP delivery is best-effort after commit.
   res.status(201).json(order);
+  void sendOrderEmails(order, req.user).catch(err =>
+    console.error('Order notification failed:',String(err.code||err.name||'delivery_error')));
 }));
 
 // All administration endpoints are protected in one place.

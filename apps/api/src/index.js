@@ -16,7 +16,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from './db.js';
 import { optionalAuth, requireAuth, requireAdmin, startSession, signOut, verifyGoogleCredential } from './auth.js';
 import { asyncRoute as route, error, orderNumber, publicUser, shippingFor, slugify, token, sha256 } from './utils.js';
-import { mailEnabled, sendResetEmail, sendOrderEmails, sendContactMail } from './mail.js';
+import { mailEnabled, smtpMissingSettings, verifySmtpConnection, sendSmtpTest, sendResetEmail, sendOrderEmails, sendContactMail, sendWelcomeEmail, sendOrderUpdateEmail, sendTrackingUpdateEmail, sendSecurityEmail } from './mail.js';
+import { orderChange, trackingChanged } from './mailTemplates.js';
 import { addressSchema, email, password, productSchema, settingsSchema, contactSchema } from './validators.js';
 import { validateStatusChange } from './orderTracking.js';
 import { recordEvent, analyticsSummary, analyticsAudience, startAnalyticsCleanup } from './analytics.js';
@@ -121,7 +122,9 @@ app.post('/api/auth/register', loginLimit, route(async (req, res) => {
   const exists = await prisma.user.findUnique({ where: { email: input.email } });
   if (exists) throw error(409, 'An account with this email already exists.');
   const user = await prisma.user.create({ data: { name: input.name, email: input.email, passwordHash: await bcrypt.hash(input.password, 12) } });
-  res.status(201).json({ user: await startSession(res, user) });
+  const publicProfile = await startSession(res, user);
+  res.status(201).json({ user: publicProfile });
+  void sendWelcomeEmail(user);
 }));
 app.post('/api/auth/login', loginLimit, route(async (req, res) => {
   const input = z.object({ email, password: z.string().min(1) }).strict().parse(req.body);
@@ -133,12 +136,16 @@ app.post('/api/auth/google', loginLimit, route(async (req, res) => {
   const { credential } = z.object({ credential: z.string().min(50).max(10000) }).strict().parse(req.body);
   const profile = await verifyGoogleCredential(credential);
   let user = await prisma.user.findUnique({ where: { googleSub: profile.sub } });
+  let createdNow = false;
   if (!user) {
     const existing = await prisma.user.findUnique({ where: { email: profile.email } });
     if (existing) throw error(409, 'This email already has an account. Sign in first, then link Google under Account settings.');
     user = await prisma.user.create({ data: { name: profile.name, email: profile.email, googleSub: profile.sub } });
+    createdNow = true;
   }
-  res.json({ user: await startSession(res, user) });
+  const publicProfile = await startSession(res, user);
+  res.json({ user: publicProfile });
+  if(createdNow) void sendWelcomeEmail(user,{google:true});
 }));
 app.post('/api/auth/forgot-password', loginLimit, route(async (req, res) => {
   const input = z.object({ email }).strict().parse(req.body);
@@ -148,7 +155,12 @@ app.post('/api/auth/forgot-password', loginLimit, route(async (req, res) => {
     const secret = token();
     await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
     await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha256(secret), expiresAt: new Date(Date.now() + 30 * 60 * 1000) } });
-    await sendResetEmail(user.email, secret).catch(err => console.error('Password recovery email failed:', err.message));
+    try { await sendResetEmail(user.email, secret); }
+    catch (err) {
+      await prisma.passwordResetToken.deleteMany({ where: { tokenHash: sha256(secret) } })
+        .catch(cleanupErr => console.error('Password recovery token cleanup failed:', String(cleanupErr.code || 'database_error')));
+      console.error('Password recovery email failed:', String(err.code || err.name || 'delivery_error'));
+    }
   }
   res.json({ message: 'If an email/password account exists, we have sent a reset link.' });
 }));
@@ -165,6 +177,9 @@ app.post('/api/auth/reset-password', loginLimit, route(async (req, res) => {
     await tx.passwordResetToken.deleteMany({ where: { userId: reset.userId, id: { not: reset.id } } });
   });
   res.json({ ok: true });
+  void prisma.user.findUnique({where:{id:reset.userId},select:{name:true,email:true}})
+    .then(user=>user && sendSecurityEmail(user,'PASSWORD_CHANGED'))
+    .catch(err=>console.error('Password notification failed:',String(err.code||err.name||'delivery_error')));
 }));
 app.post('/api/auth/logout', route(signOut));
 app.get('/api/me', requireAuth, (req, res) => res.json({ user: publicUser(req.user) }));
@@ -179,15 +194,17 @@ app.put('/api/me/password', requireAuth, route(async (req, res) => {
   await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12) } });
   await prisma.session.deleteMany({ where: { userId: req.user.id, id: { not: req.sessionId } } });
   res.json({ ok: true });
+  void sendSecurityEmail(req.user,'PASSWORD_CHANGED');
 }));
 app.post('/api/me/link-google', requireAuth, route(async (req, res) => {
-  const { credential } = z.object({ credential: z.string().min(50).max(10000) }).parse(req.body);
+  const { credential } = z.object({ credential: z.string().min(50).max(10000) }).strict().parse(req.body);
   const google = await verifyGoogleCredential(credential);
   if (google.email !== req.user.email) throw error(409, 'Google email must match the signed-in account.');
   const owned = await prisma.user.findUnique({ where: { googleSub: google.sub } });
   if (owned && owned.id !== req.user.id) throw error(409, 'This Google account is already linked elsewhere.');
   const user = await prisma.user.update({ where: { id: req.user.id }, data: { googleSub: google.sub } });
   res.json({ user: publicUser(user) });
+  void sendSecurityEmail(user,'GOOGLE_LINKED');
 }));
 
 app.get('/api/me/addresses', requireAuth, route(async (req, res) => {
@@ -320,14 +337,36 @@ app.post('/api/checkout', requireAuth, route(async (req, res) => {
     await tx.cartItem.deleteMany({ where: { userId: req.user.id } });
     return created;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 });
-  // Email failures never invalidate an order that was already committed.
-  await sendOrderEmails(order, req.user).catch(err => console.error('Order notification failed:', err.message));
+  // Return the confirmed order immediately; SMTP delivery is best-effort after commit.
   res.status(201).json(order);
+  void sendOrderEmails(order, req.user).catch(err =>
+    console.error('Order notification failed:',String(err.code||err.name||'delivery_error')));
 }));
 
 // All administration endpoints are protected in one place.
 const admin = express.Router();
 admin.use(requireAdmin);
+// Admin-only integration diagnostics; never return SMTP passwords or Google secrets.
+admin.get('/integrations',route(async (_req,res)=>{
+  res.json({
+    smtp:{configured:mailEnabled(),missing:smtpMissingSettings()},
+    google:{configured:Boolean(process.env.GOOGLE_CLIENT_ID)}
+  });
+}));
+admin.post('/integrations/verify-smtp',loginLimit,route(async (_req,res)=>{
+  const result=await verifySmtpConnection();
+  res.json(result);
+}));
+admin.post('/integrations/test-email',loginLimit,route(async (req,res)=>{
+  if(!mailEnabled())throw error(503,'Configure SMTP settings before sending a test.');
+  try { await sendSmtpTest(req.user); }
+  catch(err){
+    console.error('SMTP test delivery failed:',String(err.code||err.name||'delivery_error'));
+    throw error(503,'The mail server could not accept a test email. Check SMTP settings and your inbox.');
+  }
+  res.json({ok:true,message:'SMTP accepted the test email for your administrator address.'});
+}));
+
 admin.get('/overview', route(async (_req, res) => {
   const [products, customers, orders, recent, total] = await Promise.all([
     prisma.product.count(), prisma.user.count({ where: { role: 'CUSTOMER' } }), prisma.order.count(),
@@ -395,16 +434,23 @@ admin.get('/orders/:id', route(async (req, res) => {
 }));
 admin.patch('/orders/:id', route(async (req, res) => {
   const { status, paymentStatus } = z.object({ status: z.enum(['PLACED','CONFIRMED','PACKED','SHIPPED','DELIVERED','CANCELLED']), paymentStatus: z.enum(['PENDING','PAID','FAILED','REFUNDED']) }).strict().parse(req.body);
-  const updated = await prisma.$transaction(async tx => {
+  const {updated,before} = await prisma.$transaction(async tx => {
     const current = await tx.order.findUnique({ where: { id: req.params.id }, include: { items: true } });
     if (!current) throw error(404, 'Order not found.');
     if (!validateStatusChange(current.status, status)) throw error(409, 'Order status cannot go backwards; shipped and delivered orders cannot be cancelled here.');
     if (status === 'CANCELLED' && current.status !== 'CANCELLED') {
       for (const item of current.items) await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
     }
-    return tx.order.update({ where: { id: current.id }, data: { status, paymentStatus, ...(status !== current.status ? { statusEvents: { create: { status, createdBy: req.user.name.slice(0, 120) } } } : {}) } });
+    const changed = await tx.order.update({ where: { id: current.id }, data: { status, paymentStatus, ...(status !== current.status ? { statusEvents: { create: { status, createdBy: req.user.name.slice(0, 120) } } } : {}) } });
+    return {updated:changed,before:{status:current.status,paymentStatus:current.paymentStatus}};
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   res.json(updated);
+  const change = orderChange(before,updated);
+  if(change.statusChanged||change.paymentChanged){
+    void prisma.user.findUnique({where:{id:updated.userId},select:{name:true,email:true}})
+      .then(user=>user && sendOrderUpdateEmail(updated,user,before))
+      .catch(err=>console.error('Order email lookup failed:',String(err.code||err.name||'delivery_error')));
+  }
 }));
 admin.patch('/orders/:id/tracking', route(async (req, res) => {
   const input = z.object({
@@ -415,10 +461,16 @@ admin.patch('/orders/:id/tracking', route(async (req, res) => {
   }).strict().parse(req.body);
   const order = await prisma.order.findUnique({ where: { id: req.params.id } });
   if (!order) throw error(404, 'Order not found.');
-  res.json(await prisma.order.update({ where: { id: order.id }, data: {
+  const updated = await prisma.order.update({ where: { id: order.id }, data: {
     ...Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'estimatedDeliveryAt').map(([k, v]) => [k, v || null])),
     ...(Object.prototype.hasOwnProperty.call(input, 'estimatedDeliveryAt') ? { estimatedDeliveryAt: input.estimatedDeliveryAt ? new Date(input.estimatedDeliveryAt) : null } : {})
-  } }));
+  } });
+  res.json(updated);
+  if(trackingChanged(order,updated)){
+    void prisma.user.findUnique({where:{id:updated.userId},select:{name:true,email:true}})
+      .then(user=>user && sendTrackingUpdateEmail(updated,user))
+      .catch(err=>console.error('Tracking email lookup failed:',String(err.code||err.name||'delivery_error')));
+  }
 }));
 admin.get('/customers', route(async (_req, res) => res.json(await prisma.user.findMany({ where: { role: 'CUSTOMER' }, select: { id: true, name: true, email: true, phone: true, createdAt: true, _count: { select: { orders: true } } }, orderBy: { createdAt: 'desc' }, take: 500 }))));
 admin.put('/settings', route(async (req, res) => {

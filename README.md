@@ -224,6 +224,12 @@ From the feature branch, run `npm ci`, `npm test`, `npm run build` and `npm run 
 
 A privacy-aware first-party analytics dashboard is available at **Admin → Analytics**, with 7/30/90-day item views, clicks, wishlist/cart signals, checkout entries, non-cancelled orders and COD receipts, customer-item interest drilldowns, CSV export, and an overview shortcut. It uses the additive `ProductEvent` MySQL migration and requires no analytics SaaS. See [ANALYTICS_REPORTING.md](ANALYTICS_REPORTING.md) for data definitions, user privacy controls, 90-day retention and WAMP migration/testing steps. The root `predev` hook runs Prisma generation automatically before development servers start.
 
+## Phase 1 — Transactional email and authentication
+
+The store now includes branded text/HTML emails for customer welcome (email and Google), COD order confirmation, staff order alert, order/payment status, courier tracking, password reset and password/security notifications. Administrators can check SMTP and Google configuration under **Admin → Store settings → Connected services** and send a test email **only to their authenticated admin address**. Email is best-effort and does not reverse committed orders; production email retries and verified customer email addresses remain future work.
+
+See [EMAIL_AUTH_SETUP.md](EMAIL_AUTH_SETUP.md) for SMTP and Google OAuth setup, security limitations and local acceptance tests. No schema migrations are introduced in this phase.
+
 ## Production deployment notes
 
 Run the backend and built frontend under the **same HTTPS origin** if possible:

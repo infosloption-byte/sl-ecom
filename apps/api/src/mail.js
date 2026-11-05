@@ -1,56 +1,106 @@
 import nodemailer from 'nodemailer';
-import { lkrEmail } from './mailPricing.js';
+import {
+  welcomeMessage, placedMessage, staffOrderMessage, orderUpdateMessage, trackingMessage,
+  passwordResetMessage, securityMessage, smtpTestMessage
+} from './mailTemplates.js';
 
-export function mailEnabled() { return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.SMTP_FROM); }
-const escape = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-function transport() {
-  if (!mailEnabled()) throw new Error('Transactional email is not configured.');
+const configuredKeys=['SMTP_HOST','SMTP_USER','SMTP_PASSWORD','SMTP_FROM'];
+export const smtpMissingSettings=()=>configuredKeys.filter(key=>!process.env[key]?.trim());
+export const mailEnabled=()=>smtpMissingSettings().length===0;
+
+function transport(){
+  if(!mailEnabled())throw new Error('Transactional SMTP is not configured.');
+  const port=Number(process.env.SMTP_PORT||587);
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587),
-    secure: Number(process.env.SMTP_PORT || 587) === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+    host:process.env.SMTP_HOST,
+    port,secure:port===465,requireTLS:port!==465,
+    auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASSWORD},
+    connectionTimeout:10000,greetingTimeout:10000,socketTimeout:15000
   });
-}
-export async function sendResetEmail(email, token) {
-  const url = new URL('/reset-password', process.env.STORE_URL || 'http://localhost:5180');
-  url.searchParams.set('token', token);
-  await transport().sendMail({ from: process.env.SMTP_FROM, to: email, subject: 'Reset your SL Options Market password',
-    text: `Use this link to reset your password. It expires in 30 minutes.\n\n${url}\n\nIf you did not request this, you can ignore the message.`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:540px;margin:auto;padding:28px"><h2>Password reset</h2><p>We received a request to reset your SL Options Market password. This link expires in 30 minutes.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:14px 24px;background:#1b2b21;color:white;text-decoration:none;border-radius:8px">Reset password</a></p><p>If you did not request this change, you can safely ignore this email.</p></div>`
-  });
-}
-export async function sendOrderEmails(order, user) {
-  if (!mailEnabled()) return;
-  const items = order.items.map(item => `${item.quantity} × ${item.title}: ${lkrEmail(item.lineTotalCents)}`).join('\n');
-  const summary = `Order ${order.number}\n\n${items}\n\nShipping: ${lkrEmail(order.shippingCents)}\nTotal: ${lkrEmail(order.totalCents)}\nPayment: Cash on delivery\nDeliver to: ${order.address.fullName}, ${order.address.line1}, ${order.address.city}, ${order.address.district}\nPhone: ${order.address.phone}`;
-  const client = transport();
-  const outgoing = [client.sendMail({ from: process.env.SMTP_FROM, to: user.email, subject: `Order received · ${order.number}`, text: `Thanks for shopping with SL Options Market!\n\n${summary}\n\nWe'll process your order and arrange delivery.` })];
-  if (process.env.ORDER_ALERT_EMAIL) outgoing.push(client.sendMail({ from: process.env.SMTP_FROM, to: process.env.ORDER_ALERT_EMAIL, subject: `New store order · ${order.number}`, text: `Customer: ${user.name} <${user.email}>\n\n${summary}` }));
-  const outcomes = await Promise.allSettled(outgoing);
-  for (const result of outcomes) if (result.status === 'rejected') console.error('Order email failed:', result.reason?.message);
 }
 
-/** Forward a customer enquiry to the configured store inbox (never to an arbitrary recipient). */
-export async function sendContactMail({ name, email, topic, orderNumber, message }, destination) {
-  if (!mailEnabled()) throw new Error('Store email is not configured.');
-  const text = [
-    'New SL Options Market contact request',
-    'From: ' + name + ' (' + email + ')',
-    'Topic: ' + topic,
-    'Order number: ' + (orderNumber || 'Not supplied'),
-    '',
-    message
-  ].join('\n');
-  const client = transport();
-  try {
-    await client.sendMail({
-      from: process.env.SMTP_FROM,
-      to: destination,
-      replyTo: { name, address: email },
-      subject: 'Store enquiry · ' + topic,
-      text,
-      disableFileAccess: true,
-      disableUrlAccess: true
+async function deliver(message){
+  if(!mailEnabled())return {skipped:true};
+  const client=transport();
+  try{
+    const info=await client.sendMail({
+      from:process.env.SMTP_FROM,
+      to:message.to,subject:message.subject,text:message.text,html:message.html,
+      disableFileAccess:true,disableUrlAccess:true
     });
-  } finally { client.close(); }
+    if(!info.accepted?.length)throw new Error('SMTP did not accept a recipient.');
+    return {sent:true};
+  }finally{client.close();}
+}
+function logFailure(label,error){
+  // SMTP replies can contain customer addresses and server details: never log message body or reset links.
+  console.error('Transactional email failed ('+label+'): '+String(error.code||error.name||'delivery_error'));
+}
+export async function deliverBestEffort(label,prepare){
+  if(!mailEnabled())return {skipped:true};
+  try{
+    const message=typeof prepare==='function'?prepare():prepare;
+    if(!message)return {skipped:true};
+    return await deliver(message);
+  }
+  catch(error){logFailure(label,error);return {failed:true};}
+}
+export async function sendWelcomeEmail(user,{google=false}={}){
+  return deliverBestEffort('welcome',()=>welcomeMessage(user,{google}));
+}
+export async function sendOrderEmails(order,user){
+  if(!mailEnabled())return {skipped:true};
+  const outgoing=[['customer-order',()=>placedMessage(order,user)]];
+  if(process.env.ORDER_ALERT_EMAIL) outgoing.push(['staff-order',()=>({
+    ...staffOrderMessage(order,user),to:process.env.ORDER_ALERT_EMAIL
+  })]);
+  return Promise.all(outgoing.map(([label,message])=>deliverBestEffort(label,message)));
+}
+export async function sendOrderUpdateEmail(order,user,before){
+  return deliverBestEffort('order-update',()=>orderUpdateMessage(order,user,before));
+}
+export async function sendTrackingUpdateEmail(order,user){
+  return deliverBestEffort('delivery-tracking',()=>trackingMessage(order,user));
+}
+export async function sendSecurityEmail(user,event){
+  return deliverBestEffort('account-security',()=>securityMessage(user,event));
+}
+export async function sendResetEmail(email,token){
+  if(!mailEnabled())throw new Error('Password recovery SMTP is not configured.');
+  // Password reset links are delivered immediately and never added to a persistent queue.
+  return deliver(passwordResetMessage(email,token));
+}
+export async function sendSmtpTest(user){
+  if(!mailEnabled())throw new Error('Transactional SMTP is not configured.');
+  return deliver(smtpTestMessage(user));
+}
+export async function verifySmtpConnection(){
+  if(!mailEnabled())return {configured:false,missing:smtpMissingSettings()};
+  const client=transport();
+  try{await client.verify();return {configured:true,connected:true};}
+  catch(error){logFailure('SMTP connection test',error);return {configured:true,connected:false};}
+  finally{client.close();}
+}
+
+/** Forward a customer enquiry only to the configured store inbox. */
+export async function sendContactMail({name,email,topic,orderNumber,message},destination){
+  if(!mailEnabled())throw new Error('Store email is not configured.');
+  if(!destination)throw new Error('Store destination email is missing.');
+  const client=transport();
+  const text=[
+    'New SL Options Market contact request',
+    'From: '+name+' ('+email+')',
+    'Topic: '+topic,
+    'Order number: '+(orderNumber||'Not supplied'),
+    '',message
+  ].join('\n');
+  try{
+    const result=await client.sendMail({
+      from:process.env.SMTP_FROM,to:destination,
+      replyTo:{name,address:email},
+      subject:'Store enquiry · '+topic,
+      text,disableFileAccess:true,disableUrlAccess:true
+    });
+    if(!result.accepted?.length)throw new Error('SMTP did not accept a recipient.');
+  }finally{client.close();}
 }
